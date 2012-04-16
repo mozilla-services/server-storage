@@ -51,10 +51,13 @@ class TestWSGIApp(unittest.TestCase):
             host = "localhost"
         self.assertEquals(self.app.get_storage(request).sqluri,
                           "sqlite:////tmp/tests.db")
+        os.unlink("/tmp/tests.db")
         request.host = "some-test-host"
         self.assertEquals(self.app.get_storage(request).sqluri,
                           "sqlite:////tmp/some-test-host.db")
+        os.unlink("/tmp/some-test-host.db")
         request.host = "another-test-host"
         self.assertEquals(self.app.get_storage(request).sqluri,
                           "sqlite:////tmp/another-test-host.db")
+        os.unlink("/tmp/another-test-host.db")
 

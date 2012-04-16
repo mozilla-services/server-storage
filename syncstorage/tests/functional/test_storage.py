@@ -891,6 +891,7 @@ class TestStorage(support.TestWsgiApp):
         fd, dbfile = mkstemp()
         os.close(fd)
 
+        orig_storage = app.storages['default']
         try:
             storage = MemcachedSQLStorage('sqlite:///%s' % dbfile)
             storage.cache = BadCache()
@@ -910,6 +911,7 @@ class TestStorage(support.TestWsgiApp):
             self.app.put_json(self.root + '/storage/tabs/sure', wbo1,
                          status=503)
         finally:
+            app.storages['default'] = orig_storage
             os.remove(dbfile)
 
     def test_debug_screen(self):
