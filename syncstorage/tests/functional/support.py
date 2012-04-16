@@ -52,7 +52,6 @@ class TestWsgiApp(unittest.TestCase):
         self.appdir, self.config, self.storage, self.auth = initenv()
         # we don't support other storages for this test
         assert self.storage.sqluri.split(':/')[0] in ('mysql', 'sqlite')
-        self.sqlfile = self.storage.sqluri.split('sqlite:///')[-1]
         self.app = TestApp(make_app(self.config))
 
         # adding a user if needed
@@ -71,9 +70,11 @@ class TestWsgiApp(unittest.TestCase):
         if os.path.exists(cef_logs):
             os.remove(cef_logs)
 
-        if os.path.exists(self.sqlfile):
-            os.remove(self.sqlfile)
-        else:
-            self.auth._engine.execute('truncate users')
-            self.auth._engine.execute('truncate collections')
-            self.auth._engine.execute('truncate wbo')
+        for storage in self.app.app.app.storages.itervalues():
+            sqlfile = storage.sqluri.split('sqlite:///')[-1]
+            if os.path.exists(sqlfile):
+                os.remove(sqlfile)
+            else:
+                storage._engine.execute('truncate users')
+                storage._engine.execute('truncate collections')
+                storage._engine.execute('truncate wbo')
