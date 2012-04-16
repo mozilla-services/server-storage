@@ -47,6 +47,16 @@ import abc
 from services.pluginreg import PluginRegistry
 
 
+class StorageError(Exception):
+    """Base class for exceptions raised from the storage backend."""
+    pass
+
+
+class StorageConflictError(StorageError):
+    """Exception raised when attempting a conflicting write."""
+    pass
+
+
 class SyncStorage(PluginRegistry):
     """Abstract Base Class for the storage."""
     plugin_type = 'storage'
