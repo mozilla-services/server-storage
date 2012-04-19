@@ -1,5 +1,6 @@
 APPNAME = server-storage
 DEPS = server-core
+CHANNEL = dev
 VIRTUALENV = virtualenv
 NOSE = bin/nosetests -s --with-xunit
 TESTS = syncstorage/tests
@@ -41,7 +42,7 @@ all:	build
 build:
 	$(VIRTUALENV) --no-site-packages --distribute .
 	$(EZ) MoPyTools
-	$(BUILDAPP) $(PYPIOPTIONS) $(APPNAME) $(DEPS)
+	$(BUILDAPP) -c $(CHANNEL) $(PYPIOPTIONS) $(DEPS)
 	$(EZ) nose
 	$(EZ) WebTest
 	$(EZ) Funkload
@@ -76,9 +77,7 @@ build_rpms:
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms greenlet --version=0.3.1
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms python-memcached --version=1.47
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms MySQL-python --version=1.2.3
-	cd /tmp; wget http://pypi.build.mtv1.svc.mozilla.com/extras/PyMySQL-0.4.2.tar.gz
-	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms /tmp/PyMySQL-0.4.2.tar.gz
-	rm /tmp/PyMySQL-0.4.2.tar.gz
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms PyMySQL --version=0.5
 
 mock: build build_rpms
 	mock init
