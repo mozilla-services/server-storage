@@ -83,7 +83,7 @@ queries = {
 
     'ITEM_EXISTS': 'SELECT modified FROM %(wbo)s WHERE '
                    'collection=:collection_id AND username=:user_id '
-                   'AND id=:item_id AND ttl>:ttl',
+                   'AND id=:item_id',
 
     'DELETE_ITEMS': 'DELETE FROM %(wbo)s WHERE collection=:collection_id AND '
                     'username=:user_id AND ttl>:ttl',

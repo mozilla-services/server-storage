@@ -43,10 +43,12 @@ from collections import defaultdict
 from sqlalchemy import create_engine
 from sqlalchemy.sql import (text as sqltext, select, bindparam, insert, update,
                             and_)
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.sql.expression import _generative, Delete, _clone, ClauseList
 from sqlalchemy import util
 from sqlalchemy.sql.compiler import SQLCompiler
 
+from syncstorage.storage import StorageConflictError
 from syncstorage.storage.queries import get_query
 from syncstorage.storage.sqlmappers import (tables, users, collections,
                                             get_wbo_table_name, MAX_TTL,
@@ -463,8 +465,7 @@ class SQLStorage(object):
         collection_id = self._get_collection_id(user_id, collection_name)
         query = self._get_query('ITEM_EXISTS', user_id)
         res = safe_execute(self._engine, query, user_id=user_id,
-                           item_id=item_id,
-                           collection_id=collection_id, ttl=_int_now())
+                           item_id=item_id, collection_id=collection_id)
         res = res.fetchone()
         if res is None:
             return None
@@ -590,7 +591,10 @@ class SQLStorage(object):
                        wbo.c.collection == collection_id)
             query = update(wbo).where(key).values(**values)
 
-        safe_execute(self._engine, query)
+        try:
+            safe_execute(self._engine, query)
+        except IntegrityError:
+            raise StorageConflictError()
 
         if 'modified' in values:
             return bigint2time(values['modified'])

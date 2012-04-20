@@ -977,3 +977,14 @@ class TestStorage(support.TestWsgiApp):
             wbo = self.app.get(self.root + '/storage/col2/TEST').json
             res = self.app.put_json(self.root + '/storage/col2/TEST', wbo)
             self.assertEquals(res.body, res.headers["X-Weave-Timestamp"])
+
+    def test_that_expired_items_can_be_overwritten_via_PUT(self):
+        # Upload something with a small ttl.
+        bso = {"payload": "XYZ", "ttl": 0}
+        self.app.put_json(self.root + "/storage/col2/TEST", bso)
+        # Wait for it to expire.
+        time.sleep(0.02)
+        self.app.get(self.root + "/storage/col2/TEST", status=404)
+        # Overwriting it should still work.
+        bso = {"payload": "XYZ", "ttl": 42}
+        self.app.put_json(self.root + "/storage/col2/TEST", bso)

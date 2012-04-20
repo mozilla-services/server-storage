@@ -50,6 +50,7 @@ from services.respcodes import (WEAVE_MALFORMED_JSON, WEAVE_INVALID_WBO,
                                 WEAVE_INVALID_WRITE, WEAVE_OVER_QUOTA)
 from services import logger
 from syncstorage.wbo import WBO
+from syncstorage.storage import StorageConflictError
 
 
 _WBO_FIELDS = ['id', 'parentid', 'predecessorid', 'sortindex', 'modified',
@@ -286,8 +287,11 @@ class StorageController(object):
         if self._has_modifiers(wbo):
             wbo['modified'] = request.server_time
 
-        res = storage.set_item(user_id, collection_name, item_id,
-                               storage_time=request.server_time, **wbo)
+        try:
+            res = storage.set_item(user_id, collection_name, item_id,
+                                   storage_time=request.server_time, **wbo)
+        except StorageConflictError:
+            raise HTTPJsonBadRequest(WEAVE_INVALID_WRITE)
         response = json_response(res)
         if storage.use_quota and left <= _ONE_MEG:
             response.headers['X-Weave-Quota-Remaining'] = str(left)
