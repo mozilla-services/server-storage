@@ -966,3 +966,14 @@ class TestStorage(support.TestWsgiApp):
         # check that the batch size is correctly set
         size = get_app(self.app).controllers['storage'].batch_size
         self.assertEqual(size, 25)
+
+    def test_that_put_reports_consistent_timestamps(self):
+        # This checks for the behaviour reported in Bug 739519, where
+        # the timestamp in the body of a PUT response could be different
+        # from the one reported in X-Weave-Timestamp.
+        wbo = {'id': 'TEST', 'payload': 'DATA'}
+        res = self.app.put_json(self.root + '/storage/col2/TEST', wbo)
+        for i in xrange(200):
+            wbo = self.app.get(self.root + '/storage/col2/TEST').json
+            res = self.app.put_json(self.root + '/storage/col2/TEST', wbo)
+            self.assertEquals(res.body, res.headers["X-Weave-Timestamp"])

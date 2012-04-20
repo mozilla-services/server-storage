@@ -286,7 +286,8 @@ class StorageController(object):
         if self._has_modifiers(wbo):
             wbo['modified'] = request.server_time
 
-        res = storage.set_item(user_id, collection_name, item_id, **wbo)
+        res = storage.set_item(user_id, collection_name, item_id,
+                               storage_time=request.server_time, **wbo)
         response = json_response(res)
         if storage.use_quota and left <= _ONE_MEG:
             response.headers['X-Weave-Quota-Remaining'] = str(left)
