@@ -310,7 +310,7 @@ class SQLStorage(object):
 
     def delete_user(self, user_id):
         """Removes a user (and all its data)"""
-        for query in ('DELETE_USER_COLLECTIONS', 'DELETE_USER_WBOS',
+        for query in ('DELETE_USER_WBOS', 'DELETE_USER_COLLECTIONS',
                       'DELETE_USER'):
             query = self._get_query(query, user_id)
             safe_execute(self._engine, query, user_id=user_id)
@@ -331,7 +331,7 @@ class SQLStorage(object):
 
     def delete_storage(self, user_id):
         """Removes all user data"""
-        for query in ('DELETE_USER_COLLECTIONS', 'DELETE_USER_WBOS'):
+        for query in ('DELETE_USER_WBOS', 'DELETE_USER_COLLECTIONS'):
             query = self._get_query(query, user_id)
             safe_execute(self._engine, query, user_id=user_id)
         # XXX see if we want to check the rowcount
