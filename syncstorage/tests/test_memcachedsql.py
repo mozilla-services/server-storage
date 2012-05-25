@@ -212,6 +212,16 @@ if MEMCACHED:
             wanted += len(_PLD) / 1024.
             self.assertEquals(self.storage.get_total_size(_UID), wanted)
 
+            # if we suffer a cache clear, then get_size_left should not
+            # fall back to the database, while get_total_size should.
+            quota_size = self.storage.quota_size
+            self.storage.cache.delete('%d:size' % _UID)
+            self.assertEquals(self.storage.get_size_left(_UID), quota_size)
+            self.assertEquals(self.storage.get_total_size(_UID), wanted)
+            # that should have re-populated the cache.
+            self.assertEquals(self.storage.get_size_left(_UID),
+                              quota_size - wanted)
+            
         def test_collection_stamps(self):
             if not self._is_up():
                 return

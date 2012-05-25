@@ -338,6 +338,18 @@ class MemcachedSQLStorage(SQLStorage):
 
         return  size
 
+    def get_size_left(self, user_id, recalculate=False):
+        """Returns the storage left for a user"""
+        # This gets called to check quota on every write operation,
+        # so don't recalculate from the database unless explicitly asked.
+        if recalculate:
+            size = self.get_total_size(user_id, recalculate)
+        else:
+            size = self.cache.get_total(user_id)
+            if not size:
+                size = 0
+        return self.quota_size - size
+
     def get_collection_sizes(self, user_id):
         """Returns the total size in KB for each collection of a user storage.
         """
