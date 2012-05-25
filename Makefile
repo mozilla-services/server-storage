@@ -1,5 +1,6 @@
 APPNAME = server-storage
 DEPS = server-core
+CHANNEL = dev
 VIRTUALENV = virtualenv
 NOSE = bin/nosetests -s --with-xunit
 TESTS = syncstorage/tests
