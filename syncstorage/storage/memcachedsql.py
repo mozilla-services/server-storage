@@ -40,6 +40,7 @@ Memcached + SQL backend
 - The total storage size is stored in "user_id:size"
 - The meta/global wbo is stored in "user_id"
 """
+import time
 import simplejson as json
 
 from sqlalchemy.sql import select, bindparam, func
@@ -51,6 +52,8 @@ from syncstorage.storage.sql import SQLStorage, _KB
 from syncstorage.storage.sqlmappers import wbo
 from syncstorage.storage.cachemanager import CacheManager
 
+# Recalculate quota at most once per hour.
+QUOTA_RECALCULATION_PERIOD = 60 * 60
 
 _COLLECTION_LIST = select([wbo.c.collection, func.max(wbo.c.modified),
                            func.count(wbo)],
@@ -325,12 +328,19 @@ class MemcachedSQLStorage(SQLStorage):
             # adding the tabs
             size += self.cache.get_tabs_size(user_id)
 
-            # update the cache
+            # update the cache and timestamp
             self.cache.set_total(user_id, size)
+            self.cache.set(_key(user_id, "size", "ts"), int(time.time()))
             return size
 
+        # Recalculate from the DB if requested, and if we haven't
+        # already done so recently.
         if recalculate:
-            return _get_set_size()
+            last_recalc = self.cache.get(_key(user_id, "size", "ts"))
+            if last_recalc is None:
+                return _get_set_size()
+            if time.time() - last_recalc > QUOTA_RECALCULATION_PERIOD:
+                return _get_set_size()
 
         size = self.cache.get_total(user_id)
         if not size:    # memcached server seems down or needs a reset

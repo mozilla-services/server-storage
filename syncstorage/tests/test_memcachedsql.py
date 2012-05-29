@@ -41,10 +41,14 @@ import os
 
 try:
     from syncstorage.storage.memcachedsql import MemcachedSQLStorage
+    from syncstorage.storage.memcachedsql import QUOTA_RECALCULATION_PERIOD
+    from syncstorage.storage.memcachedsql import _KB
     MEMCACHED = True
 except ImportError:
     MEMCACHED = False
+
 from syncstorage.storage import SyncStorage
+from syncstorage.controller import _ONE_MEG
 from services.util import BackendError, round_time
 
 _UID = 1
@@ -221,7 +225,7 @@ if MEMCACHED:
             # that should have re-populated the cache.
             self.assertEquals(self.storage.get_size_left(_UID),
                               quota_size - wanted)
-            
+
         def test_collection_stamps(self):
             if not self._is_up():
                 return
@@ -350,6 +354,37 @@ if MEMCACHED:
             # Max timestamp for an empty collection should be None.
             ts = self.storage.get_collection_max_timestamp(_UID, "meta")
             self.assertEquals(ts, None)
+
+        def test_recalculation_of_cached_quota_usage(self):
+            storage = self.storage
+            sqlstorage = self.storage.sqlstorage
+
+            # Create a large BSO, to ensure that it's close to quota size.
+            payload_size = storage.quota_size - _ONE_MEG + 1
+            payload = "X" * int(payload_size * _KB)
+
+            # After writing it, size in memcached and sql should be the same.
+            storage.set_item(_UID, 'foo', '1', payload=payload)
+            self.assertEquals(sqlstorage.get_total_size(_UID), payload_size)
+            self.assertEquals(storage.get_total_size(_UID, recalculate=True),
+                              payload_size)
+
+            # Deleting the BSO in the database won't adjust the cached size.
+            sqlstorage.delete_item(_UID, 'foo', '1')
+            self.assertEquals(sqlstorage.get_total_size(_UID), 0)
+            self.assertEquals(storage.get_total_size(_UID, recalculate=True),
+                              payload_size)
+
+            # Adjust the cache to pretend that hasn't been recalculated lately.
+            last_recalc_key = str(_UID) + ":size:ts"
+            last_recalc = storage.cache.get(last_recalc_key)
+            last_recalc -= QUOTA_RECALCULATION_PERIOD + 1
+            storage.cache.set(last_recalc_key, last_recalc)
+
+            # Now it should recalculate when asked for the size.
+            self.assertEquals(sqlstorage.get_total_size(_UID), 0)
+            self.assertEquals(storage.get_total_size(_UID, False), payload_size)
+            self.assertEquals(storage.get_total_size(_UID, True), 0)
 
 
 def test_suite():
