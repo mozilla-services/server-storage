@@ -65,9 +65,6 @@ cover:
 
 build_rpms:
 	$(BUILDRPMS) -c $(RPM_CHANNEL) $(PYPIOPTIONS) $(DEPS)
-	cd /tmp; wget http://pypi.build.mtv1.svc.mozilla.com/extras/PyMySQL-0.4.2.tar.gz
-	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms /tmp/PyMySQL-0.4.2.tar.gz
-	rm /tmp/PyMySQL-0.4.2.tar.gz
 
 mock: build build_rpms
 	mock init
