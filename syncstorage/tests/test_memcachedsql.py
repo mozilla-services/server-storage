@@ -356,6 +356,8 @@ if MEMCACHED:
             self.assertEquals(ts, None)
 
         def test_recalculation_of_cached_quota_usage(self):
+            if not self._is_up():
+                return
             storage = self.storage
             sqlstorage = self.storage.sqlstorage
 
