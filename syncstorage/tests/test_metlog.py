@@ -46,11 +46,11 @@ class TestMetlog(unittest.TestCase):
     def setUp(self):
         config_file = os.path.join(os.path.dirname(__file__), "sync.conf")
         self.app = make_app({"configuration": "file:" + config_file}).app
+        self.username = 'arfoo'
 
-    def test_timer_and_incr_msgs_are_firing(self):
-        username = 'arfoo'
-        path = '/1.1/%s/info/collections' % username
-        environ = {'REMOTE_USER': username}
+    def test_stats_no_services_data(self):
+        path = '/1.1/%s/info/collections' % self.username
+        environ = {'REMOTE_USER': self.username}
         request = make_request(path, environ)
         self.app(request)
         sender = self.app.logger.sender
@@ -59,3 +59,30 @@ class TestMetlog(unittest.TestCase):
         self.assertEqual(msg0.get('type'), 'timer')
         msg1 = json.loads(sender.msgs[1])
         self.assertEqual(msg1.get('type'), 'counter')
+
+    def test_services_data(self):
+        path = '/1.1/%s/info/collections' % self.username
+        environ = {'REMOTE_USER': self.username}
+        request = make_request(path, environ)
+        controller = self.app.controllers['storage']
+        wrapped_method = controller._get_collections_wrapped
+        orig_inner = wrapped_method._fn._fn._fn
+        data = {'foo': 'bar'}
+
+        def services_data_wrapper(fn):
+            from services.metrics import update_metlog_data
+
+            def new_inner(*args, **kwargs):
+                update_metlog_data(data)
+                return fn(*args, **kwargs)
+
+            return new_inner
+
+        wrapped_method._fn._fn._fn = services_data_wrapper(orig_inner)
+        self.app(request)
+        sender = self.app.logger.sender
+        self.assertEqual(len(sender.msgs), 3)
+        msg2 = json.loads(sender.msgs[2])
+        self.assertEqual(msg2.get('type'), 'services')
+        self.assertEqual(msg2.get('fields'), data)
+        wrapped_method._fn._fn._fn = orig_inner
