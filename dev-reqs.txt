@@ -18,3 +18,7 @@ pymysql_sa
 gevent
 greenlet
 PyMySQL
+repoze.lru
+repoze.who
+zope.deprecation
+zope.interface
