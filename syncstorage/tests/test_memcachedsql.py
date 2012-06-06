@@ -135,7 +135,7 @@ if MEMCACHED:
                 meta = self.storage.cache.get('1:meta:global')
                 self.assertEquals(meta, None)
                 size = self.storage.cache.get('1:size')
-                self.assertEquals(size, None)
+                self.assertEquals(size, len(_PLD))
 
             # let's store some items in the meta collection
             # and checks that the global object is uploaded
@@ -277,14 +277,15 @@ if MEMCACHED:
             # deleting the item should also update the stamp
             time.sleep(0.2)    # to make sure the stamps differ
             now = round_time()
+            cached_size = self.storage.cache.get('1:size')
             self.storage.delete_item(_UID, 'baz', '2', storage_time=now)
             stamps = self.storage.get_collection_timestamps(_UID)
             self.assertEqual(stamps['baz'], now)
 
-            # and that kills the size cache
-            self.assertTrue(self.storage.cache.get('1:size') is None)
+            # that should have left the cached size along.
+            self.assertEquals(self.storage.cache.get('1:size'), cached_size)
 
-            # until we asked for it again
+            # until we force it to be recalculated.
             size = self.storage.get_collection_sizes(1)
             self.assertEqual(self.storage.cache.get('1:size') / 1024.,
                              sum(size.values()))
