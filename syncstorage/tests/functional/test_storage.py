@@ -37,11 +37,15 @@
 Basic tests to verify that the dispatching mechanism works.
 """
 import os
+import sys
 import base64
 import time
 import struct
 import random
 import string
+import optparse
+import getpass
+import unittest
 import simplejson as json
 from decimal import Decimal
 from tempfile import mkstemp
@@ -67,22 +71,24 @@ class TestStorage(support.TestWsgiApp):
         super(TestStorage, self).setUp()
         # user auth token
         token = base64.encodestring('%s:%s' % (self.user_name, self.password))
-        environ = {'HTTP_AUTHORIZATION': 'Basic %s' % token}
-        self.app.extra_environ = environ
+        environ = {'HTTP_AUTHORIZATION': 'Basic %s' % token.strip()}
+        self.app.extra_environ.update(environ)
         self.root = '/1.0/%s' % self.user_name
 
+        self.app.delete(self.root + '/storage',
+                        headers={'X-Confirm-Delete': '1'})
         # let's create some collections for our tests
         for name in ('client', 'crypto', 'forms', 'history', 'col1', 'col2'):
-            self.storage.set_collection(self.user_id, name)
+            self.app.post_json(self.root + '/storage/' + name, [])
 
         for item in range(3):
-            self.storage.set_item(self.user_id, 'col1', str(item),
-                                  payload='xxx')
+            self.app.put_json(self.root + '/storage/col1/' + str(item),
+                              {'payload': 'xxx'})
             time.sleep(0.02)   # make sure we have different timestamps
 
         for item in range(5):
-            self.storage.set_item(self.user_id, 'col2', str(item),
-                                  payload='xxx')
+            self.app.put_json(self.root + '/storage/col2/' + str(item),
+                              {'payload': 'xxx'})
             time.sleep(0.02)   # make sure we have different timestamps
 
     def test_get_collections(self):
@@ -96,7 +102,6 @@ class TestStorage(support.TestWsgiApp):
         # XXX need to test collections timestamps here
 
     def test_get_collection_count(self):
-
         resp = self.app.get(self.root + '/info/collection_counts')
         res = resp.json
         values = res.values()
@@ -115,7 +120,7 @@ class TestStorage(support.TestWsgiApp):
         numcols = len(resp.json)
 
         # 2. add a new collection + stuff
-        self.storage.set_collection(self.user_id, 'xxxx')
+        self.app.post_json(self.root + '/storage/xxx', [])
         wbo = {'id': '125', 'payload': _PLD, 'predecessorid': 'XXXX'}
         self.app.put_json(self.root + '/storage/xxxx/125', wbo)
 
@@ -149,8 +154,6 @@ class TestStorage(support.TestWsgiApp):
         wbo1 = {'id': '125', 'payload': _PLD, 'predecessorid': 'XXXX'}
         wbos = [wbo1]
         self.app.post_json(self.root + '/storage/col2', wbos)
-        #self.storage.set_item(self.user_id, 'col2', '125',
-        #                      predecessorid='XXXX')
         res = self.app.get(self.root + '/storage/col2?predecessorid=XXXX')
         res = res.json
         self.assertEquals(res, ['125'])
@@ -162,10 +165,6 @@ class TestStorage(support.TestWsgiApp):
         wbo2 = {'id': '127', 'payload': 'x', 'parentid': 'papa'}
         wbos = [wbo1, wbo2]
         self.app.post_json(self.root + '/storage/col2', wbos)
-        #self.storage.set_item(self.user_id, 'col2', '126', parentid='papa',
-        #                      payload='x')
-        #self.storage.set_item(self.user_id, 'col2', '127', parentid='papa',
-        #                      payload='x')
         res = self.app.get(self.root + '/storage/col2?parentid=papa')
         res = res.json
         res.sort()
@@ -174,15 +173,11 @@ class TestStorage(support.TestWsgiApp):
         # "older"
         # Returns only ids for objects in the collection that have been last
         # modified before the date given.
-
-        #self.storage.delete_items(self.user_id, 'col2')
         self.app.delete(self.root + '/storage/col2')
-
         wbo = {'id': '128', 'payload': 'x'}
         res = self.app.put_json(self.root + '/storage/col2/128', wbo)
         ts = res.json
 
-        #ts = self.storage.set_item(self.user_id, 'col2', '128', payload='x')
         fts = json.dumps(ts)
         time.sleep(.3)
 
@@ -190,7 +185,6 @@ class TestStorage(support.TestWsgiApp):
         res = self.app.put_json(self.root + '/storage/col2/129', wbo)
         ts2 = res.json
 
-        #ts2 = self.storage.set_item(self.user_id, 'col2', '129', payload='x')
         fts2 = json.dumps(ts2)
 
         self.assertTrue(fts < fts2)
@@ -402,7 +396,8 @@ class TestStorage(support.TestWsgiApp):
         self.app.get(self.root + '/storage/col2/two', status=404)
 
     def test_collection_usage(self):
-        self.storage.delete_storage(self.user_id)
+        self.app.delete(self.root + '/storage',
+                        headers=[('X-Confirm-Delete', '1')])
 
         wbo1 = {'id': 13, 'payload': 'XyX'}
         wbo2 = {'id': 14, 'payload': _PLD}
@@ -416,7 +411,7 @@ class TestStorage(support.TestWsgiApp):
         self.assertEqual(col2_size, wanted / 1024.)
 
     def test_delete_collection(self):
-        self.storage.delete_items(self.user_id, 'col2')
+        self.app.delete(self.root + '/storage/col2')
 
         # creating a collection of three
         wbo1 = {'id': 12, 'payload': _PLD}
@@ -500,8 +495,12 @@ class TestStorage(support.TestWsgiApp):
         # Only delete objects with a higher sortindex than the value
         # specified
         self.app.delete(self.root + '/storage/col2')
-        self.storage.set_item(self.user_id, 'col2', '130', sortindex=11)
-        self.storage.set_item(self.user_id, 'col2', '131', sortindex=9)
+        self.app.put_json(self.root + '/storage/col2/130', {
+            'sortindex': 11,
+        })
+        self.app.put_json(self.root + '/storage/col2/131', {
+            'sortindex': 9,
+        })
         res = self.app.delete(self.root + '/storage/col2?index_above=10')
         res = self.app.get(self.root + '/storage/col2')
         res = res.json
@@ -511,8 +510,12 @@ class TestStorage(support.TestWsgiApp):
         # Only delete objects with a lower sortindex than the value
         # specified.
         self.app.delete(self.root + '/storage/col2')
-        self.storage.set_item(self.user_id, 'col2', '130', sortindex=11)
-        self.storage.set_item(self.user_id, 'col2', '131', sortindex=9)
+        self.app.put_json(self.root + '/storage/col2/130', {
+            'sortindex': 11,
+        })
+        self.app.put_json(self.root + '/storage/col2/131', {
+            'sortindex': 9,
+        })
         res = self.app.delete(self.root + '/storage/col2?index_below=10')
         res = self.app.get(self.root + '/storage/col2')
         res = res.json
@@ -538,7 +541,7 @@ class TestStorage(support.TestWsgiApp):
         # check this with toby
 
     def test_delete_item(self):
-        self.storage.delete_items(self.user_id, 'col2')
+        self.app.delete(self.root + '/storage/col2')
 
         # creating a collection of three
         wbo1 = {'id': 12, 'payload': _PLD}
@@ -558,7 +561,7 @@ class TestStorage(support.TestWsgiApp):
         self.app.delete(self.root + '/storage/col2/12982')
 
     def test_delete_storage(self):
-        self.storage.delete_items(self.user_id, 'col2')
+        self.app.delete(self.root + '/storage/col2')
 
         # creating a collection of three
         wbo1 = {'id': 12, 'payload': _PLD}
@@ -573,11 +576,11 @@ class TestStorage(support.TestWsgiApp):
         self.app.delete(self.root + '/storage', status=400)
 
         # deleting all for real now
-        res = self.app.delete(self.root + '/storage/col2',
-                              headers=[('X-Confirm-Delete', '1')])
+        res = self.app.delete(self.root + '/storage',
+                              headers=[("X-Confirm-Delete", "1")])
         res = json.loads(res.body)
         now = time.time()
-        self.assertTrue(abs(now - float(res)) < 0.2)
+        self.assertTrue(abs(now - float(res)) < 0.5)
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 0)
 
@@ -621,6 +624,9 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(used - old_used, len(_PLD) / 1024.)
 
     def test_overquota(self):
+        # This can't be run against a live server.
+        if self.distant:
+            return
 
         def _set_quota(size):
             class FakeReq:
@@ -692,6 +698,9 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(len(res['failed']), 1)
 
     def test_blacklisted_nodes(self):
+        # This can't be run against a live server.
+        if self.distant:
+            return
         app = get_app(self.app)
         old = app.config.get('storage.check_blacklisted_nodes', False)
         app.config['storage.check_blacklisted_nodes'] = True
@@ -865,6 +874,9 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(res, ['3', '4'])
 
     def test_write_tabs_503(self):
+        # This can't be run against a live server.
+        if self.distant:
+            return True
         # make sure a tentative to write in tabs w/ memcached leads to a 503
         try:
             from syncstorage.storage.memcachedsql import MemcachedSQLStorage
@@ -915,18 +927,22 @@ class TestStorage(support.TestWsgiApp):
             os.remove(dbfile)
 
     def test_debug_screen(self):
+        # This can't be run against a live server.
+        if self.distant:
+            return
         # deactivated by default
         self.app.get(self.root + '/__debug__', status=404)
-
         # let's activate it
         app = get_app(self.app)
         app.debug_page = '__debug__'
-
         # what do we have ?
         res = self.app.get('/__debug__')
         self.assertTrue('- backend: sql' in res.body)
 
     def test_batch_size(self):
+        # This can't be run against a live server.
+        if self.distant:
+            return
         # check that the batch size is correctly set
         size = get_app(self.app).controllers['storage'].batch_size
         self.assertEqual(size, 25)
@@ -983,3 +999,64 @@ class TestStorage(support.TestWsgiApp):
         # Overwriting it should still work.
         bso = {"payload": "XYZ", "ttl": 42}
         self.app.put_json(self.root + "/storage/col2/TEST", bso)
+
+
+# When executed as a script, run the functional test suite against a live
+# instance of the server.  This requires explicitly specifying a username
+# and password to use for the tests.
+
+if __name__ == "__main__":
+
+    usage = "Usage: %prog [options] <server-url>"
+    parser = optparse.OptionParser(usage=usage)
+    parser.add_option("-u", "--username",
+                      help="username with which to connect to the server")
+    parser.add_option("-p", "--password",
+                      help="password with which to connect to the server")
+    parser.add_option("", "--config-file",
+                      help="identifier for the config file used by the server")
+    parser.add_option("", "--create-user", action="store_true",
+                      help="create the specified user in the auth backend")
+    if sys.version_info >= (2,7):
+        parser.add_option("-x", "--failfast", action="store_true",
+                          help="stop after the first failed test")
+
+    opts, args = parser.parse_args(sys.argv)
+    if len(args) != 2:
+        parser.print_usage()
+        sys.exit(2)
+
+    url = os.environ["TEST_REMOTE"] = args[1]
+    if opts.config_file is not None:
+        os.environ["WEAVE_TESTFILE"] = opts.config_file
+
+    while opts.username is None:
+        opts.username = raw_input("Username: ")
+    while opts.password is None:
+        opts.password = getpass.getpass("Password: ")
+
+    # Customize the test class to use the given user details.
+    class LiveTestStorage(TestStorage):
+
+        def _setup_user(self):
+            self.user_name = opts.username
+            self.password = opts.password
+            if opts.create_user:
+                self.auth.create_user(self.user_name, self.password,
+                                      "test@example.com")
+
+        def _teardown_user(self):
+            pass
+
+    # Run the customized test class via runner object.
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(LiveTestStorage))
+    runner_args = {}
+    runner_args["stream"] = sys.stderr
+    if sys.version_info >= (2,7):
+        runner_args["failfast"] = opts.failfast
+    runner = unittest.TextTestRunner(**runner_args)
+    res = runner.run(suite)
+    if not res.wasSuccessful():
+        sys.exit(1)
+    sys.exit(0)

@@ -38,8 +38,10 @@
 import os
 import unittest
 import random
+import urlparse
 
 from webtest import TestApp
+from wsgiproxy.app import WSGIProxyApp
 
 from syncstorage.tests.support import initenv
 from syncstorage.wsgiapp import make_app
@@ -52,29 +54,46 @@ class TestWsgiApp(unittest.TestCase):
         self.appdir, self.config, self.storage, self.auth = initenv()
         # we don't support other storages for this test
         assert self.storage.sqluri.split(':/')[0] in ('mysql', 'sqlite')
-        self.app = TestApp(make_app(self.config))
+        test_remote_url = os.environ.get("TEST_REMOTE")
+        if test_remote_url is not None:
+            self.distant = True
+            test_remote_url_p = urlparse.urlparse(test_remote_url)
+            self.app = TestApp(WSGIProxyApp(test_remote_url), extra_environ={
+                "HTTP_HOST": test_remote_url_p.netloc,
+                "wsgi.url_scheme": test_remote_url_p.scheme or "http",
+                "SERVER_NAME": test_remote_url_p.hostname,
+                "REMOTE_ADDR": "127.0.0.1",
+            })
+        else:
+            self.distant = False
+            self.app = TestApp(make_app(self.config))
+        self._setup_user()
 
-        # adding a user if needed
+    def tearDown(self):
+        self._teardown_user()
+        if not self.distant:
+            # Remove any generated log files.
+            cef_logs = os.path.join(self.appdir, 'test_cef.log')
+            if os.path.exists(cef_logs):
+                os.remove(cef_logs)
+            # Delete or truncate database we may have touched.
+            for storage in self.app.app.app.storages.itervalues():
+                sqlfile = storage.sqluri.split('sqlite:///')[-1]
+                if os.path.exists(sqlfile):
+                    os.remove(sqlfile)
+                else:
+                    storage._engine.execute('truncate users')
+                    storage._engine.execute('truncate collections')
+                    storage._engine.execute('truncate wbo')
+
+    def _setup_user(self):
         self.user_name = 'test_user_%d' % random.randint(1, 100000)
         self.password = 'x' * 9
         self.auth.create_user(self.user_name, self.password,
                               'tarek@mozilla.com')
-        self.user_id = self.auth.get_user_id(self.user_name)
 
-    def tearDown(self):
-        self.storage.delete_storage(self.user_id)
-        if not self.auth.delete_user(self.user_id, self.password):
+    def _teardown_user(self):
+        user_id = self.auth.get_user_id(self.user_name)
+        self.storage.delete_storage(user_id)
+        if not self.auth.delete_user(user_id, self.password):
             raise ValueError('Could not remove user "%s"' % self.user_name)
-
-        cef_logs = os.path.join(self.appdir, 'test_cef.log')
-        if os.path.exists(cef_logs):
-            os.remove(cef_logs)
-
-        for storage in self.app.app.app.storages.itervalues():
-            sqlfile = storage.sqluri.split('sqlite:///')[-1]
-            if os.path.exists(sqlfile):
-                os.remove(sqlfile)
-            else:
-                storage._engine.execute('truncate users')
-                storage._engine.execute('truncate collections')
-                storage._engine.execute('truncate wbo')
