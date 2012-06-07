@@ -11,3 +11,5 @@ cover
 nosetests.xml
 \.coverage
 \.git
+.channel
+man
