@@ -48,22 +48,26 @@ class TestMetlog(unittest.TestCase):
         self.app = make_app({"configuration": "file:" + config_file}).app
         self.username = 'arfoo'
 
-    def test_stats_no_services_data(self):
+    def test_stats_go_out(self):
         path = '/1.1/%s/info/collections' % self.username
         environ = {'REMOTE_USER': self.username}
         request = make_request(path, environ)
         self.app(request)
         sender = self.app.logger.sender
-        self.assertEqual(len(sender.msgs), 2)
+        self.assertEqual(len(sender.msgs), 3)
         msg0 = json.loads(sender.msgs[0])
         self.assertEqual(msg0.get('type'), 'timer')
         msg1 = json.loads(sender.msgs[1])
         self.assertEqual(msg1.get('type'), 'counter')
+        msg2 = json.loads(sender.msgs[2])
+        self.assertEqual(msg2.get('type'), 'services')
+        self.assertEqual(msg2.get('fields'), {'user_agent': 'None'})
 
-    def test_services_data(self):
+    def test_addl_services_data(self):
         path = '/1.1/%s/info/collections' % self.username
         environ = {'REMOTE_USER': self.username}
         request = make_request(path, environ)
+        request.user_agent = 'USER_AGENT'
         controller = self.app.controllers['storage']
         wrapped_method = controller._get_collections_wrapped
         orig_inner = wrapped_method._fn._fn._fn
@@ -84,5 +88,7 @@ class TestMetlog(unittest.TestCase):
         self.assertEqual(len(sender.msgs), 3)
         msg2 = json.loads(sender.msgs[2])
         self.assertEqual(msg2.get('type'), 'services')
-        self.assertEqual(msg2.get('fields'), data)
+        expected = data.copy()
+        expected['user_agent'] = 'USER_AGENT'
+        self.assertEqual(msg2.get('fields'), expected)
         wrapped_method._fn._fn._fn = orig_inner
