@@ -39,18 +39,18 @@ Memcached + SQL backend
 - User tabs are stored in one single "user_id:tabs" key
 - The total storage size is stored in "user_id:size"
 - The meta/global wbo is stored in "user_id"
+- The info/collections timestamp mapping is stored in "user_id:stamps"
 """
 import time
 import simplejson as json
 
 from sqlalchemy.sql import select, bindparam, func
 
-from services.util import BackendError, round_time
-from services import logger
+from services.util import round_time
 
-from syncstorage.storage.sql import SQLStorage, _KB
+from syncstorage.storage.sql import SQLStorage
 from syncstorage.storage.sqlmappers import wbo
-from syncstorage.storage.cachemanager import CacheManager
+from syncstorage.storage.cachemanager import CacheManager, _key
 
 # Recalculate quota at most once per hour.
 QUOTA_RECALCULATION_PERIOD = 60 * 60
@@ -58,10 +58,6 @@ QUOTA_RECALCULATION_PERIOD = 60 * 60
 _COLLECTION_LIST = select([wbo.c.collection, func.max(wbo.c.modified),
                            func.count(wbo)],
             wbo.c.username == bindparam('user_id')).group_by(wbo.c.collection)
-
-
-def _key(*args):
-    return ':'.join([str(arg) for arg in args])
 
 
 # XXX suboptimal: creates an object on every dump/load call
@@ -182,11 +178,6 @@ class MemcachedSQLStorage(SQLStorage):
 
         return _get_item()
 
-    def _delete_cache(self, user_id):
-        """Removes all cached data."""
-        for key in ('size', 'meta:global', 'tabs'):
-            self.cache.delete(_key(user_id, key))
-
     def _update_stamp(self, user_id, collection_name, storage_time):
         # update the stamps cache
         if storage_time is None:
@@ -256,8 +247,9 @@ class MemcachedSQLStorage(SQLStorage):
     def delete_item(self, user_id, collection_name, item_id,
                     storage_time=None):
         """Deletes an item"""
-        # delete the cached size - will be recalculated
-        self.cache.delete(_key(user_id, 'size'))
+        # Since we don't know how large the item is, we can't make any
+        # useful adjustment to the cached size.  Just leave it alone and
+        # rely on automatic recalculation to keep it semi-accurate.
 
         # update the meta/global cache or the tabs cache
         if self._is_meta_global(collection_name, item_id):
@@ -279,8 +271,9 @@ class MemcachedSQLStorage(SQLStorage):
                      filters=None, limit=None, offset=None, sort=None,
                      storage_time=None):
         """Deletes items. All items are removed unless item_ids is provided"""
-        # delete the cached size
-        self.cache.delete(_key(user_id, 'size'))
+        # Since we don't know how large the items are, we can't make any
+        # useful adjustment to the cached size.  Just leave it alone and
+        # rely on automatic recalculation to keep it semi-accurate.
 
         # remove the cached values
         if (collection_name == 'meta' and (item_ids is None
@@ -300,24 +293,6 @@ class MemcachedSQLStorage(SQLStorage):
         if res:
             self._update_stamp(user_id, collection_name, storage_time)
         return res
-
-    def _set_cached_size(self, user_id, size):
-        key = _key(user_id, 'size')
-        # if this fail it's not a big deal
-        try:
-            # we store the size in bytes in memcached
-            self.cache.set(key, size * _KB)
-        except BackendError:
-            logger.error('Could not write to memcached')
-
-    def _get_cached_size(self, user_id):
-        try:
-            size = self.cache.get(_key(user_id, 'size'))
-            if size != 0 and size is not None:
-                size = size / _KB
-        except BackendError:
-            size = None
-        return size
 
     def get_total_size(self, user_id, recalculate=False):
         """Returns the total size in KB of a user storage"""

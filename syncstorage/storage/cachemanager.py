@@ -39,6 +39,7 @@ Memcached + SQL backend
 - User tabs are stored in one single "user_id:tabs" key
 - The total storage size is stored in "user_id:size"
 - The meta/global wbo is stored in "user_id"
+- The info/collections timestamp mapping is stored in "user_id:stamps"
 """
 import threading
 import thread
@@ -52,7 +53,7 @@ from services.events import REQUEST_ENDS, subscribe
 
 from syncstorage.storage.sql import _KB
 
-USER_KEYS = ('size', 'meta:global', 'tabs', 'stamps')
+USER_KEYS = ('size', 'size:ts', 'meta:global', 'tabs', 'stamps')
 
 
 def _key(*args):

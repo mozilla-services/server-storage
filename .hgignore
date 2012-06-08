@@ -11,5 +11,5 @@ cover
 nosetests.xml
 \.coverage
 \.git
-syntax: glob
 .channel
+man
