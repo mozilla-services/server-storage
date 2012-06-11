@@ -1017,7 +1017,7 @@ if __name__ == "__main__":
                       help="identifier for the config file used by the server")
     parser.add_option("", "--create-user", action="store_true",
                       help="create the specified user in the auth backend")
-    if sys.version_info >= (2,7):
+    if sys.version_info >= (2, 7):
         parser.add_option("-x", "--failfast", action="store_true",
                           help="stop after the first failed test")
 
@@ -1053,7 +1053,7 @@ if __name__ == "__main__":
     suite.addTest(unittest.makeSuite(LiveTestStorage))
     runner_args = {}
     runner_args["stream"] = sys.stderr
-    if sys.version_info >= (2,7):
+    if sys.version_info >= (2, 7):
         runner_args["failfast"] = opts.failfast
     runner = unittest.TextTestRunner(**runner_args)
     res = runner.run(suite)

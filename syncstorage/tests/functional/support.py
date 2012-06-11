@@ -41,10 +41,23 @@ import random
 import urlparse
 
 from webtest import TestApp
-from wsgiproxy.app import WSGIProxyApp
+import wsgiproxy.app
 
 from syncstorage.tests.support import initenv
 from syncstorage.wsgiapp import make_app
+
+
+class WSGIProxyApp(wsgiproxy.app.WSGIProxyApp):
+
+    def setup_forwarded_environ(self, environ):
+        super(WSGIProxyApp, self).setup_forwarded_environ(environ)
+        # Auth checks don't work if HTTP_HOST contains a standard port num.
+        if environ["wsgi.url_scheme"] == "https":
+            if environ["HTTP_HOST"].endswith(":443"):
+                environ["HTTP_HOST"] = environ["HTTP_HOST"].rsplit(":", 1)[0]
+        elif environ["wsgi.url_scheme"] == "http":
+            if environ["HTTP_HOST"].endswith(":80"):
+                environ["HTTP_HOST"] = environ["HTTP_HOST"].rsplit(":", 1)[0]
 
 
 class TestWsgiApp(unittest.TestCase):
