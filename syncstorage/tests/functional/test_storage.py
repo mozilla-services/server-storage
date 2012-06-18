@@ -459,15 +459,13 @@ class TestStorage(support.TestWsgiApp):
         wbo1 = {'id': 12, 'payload': _PLD, 'parentid': 1}
         wbo2 = {'id': 13, 'payload': _PLD, 'parentid': 1}
         wbos = [wbo1, wbo2]
-        self.app.post_json(self.root + '/storage/col2', wbos)
+        res = self.app.post_json(self.root + '/storage/col2', wbos)
 
-        time.sleep(.1)
-        now = time.time()
+        now = float(res.headers["X-Weave-Timestamp"]) + 0.01
         time.sleep(.1)
         wbo3 = {'id': 14, 'payload': _PLD, 'parentid': 2}
         wbos = [wbo3]
         self.app.post_json(self.root + '/storage/col2', wbos)
-
         self.app.delete(self.root + '/storage/col2?older=%f' % now)
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 1)
@@ -479,9 +477,9 @@ class TestStorage(support.TestWsgiApp):
         wbo1 = {'id': 12, 'payload': _PLD, 'parentid': 1}
         wbo2 = {'id': 13, 'payload': _PLD, 'parentid': 1}
         wbos = [wbo1, wbo2]
-        self.app.post_json(self.root + '/storage/col2', wbos)
+        res = self.app.post_json(self.root + '/storage/col2', wbos)
 
-        now = time.time()
+        now = float(res.headers["X-Weave-Timestamp"]) + 0.01
         time.sleep(.3)
         wbo3 = {'id': 14, 'payload': _PLD, 'parentid': 2}
         wbos = [wbo3]
@@ -579,12 +577,13 @@ class TestStorage(support.TestWsgiApp):
         res = self.app.delete(self.root + '/storage',
                               headers=[("X-Confirm-Delete", "1")])
         res = json.loads(res.body)
-        now = time.time()
-        self.assertTrue(abs(now - float(res)) < 0.5)
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 0)
 
     def test_x_weave_timestamp(self):
+        if self.distant:
+            return
+
         now = time.time()
         res = self.app.get(self.root + '/storage/col2')
         self.assertTrue(abs(now -
