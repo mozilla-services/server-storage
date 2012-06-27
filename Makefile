@@ -66,6 +66,21 @@ cover:
 
 build_rpms:
 	$(BUILDRPMS) -c $(RPM_CHANNEL) $(PYPIOPTIONS) $(DEPS)
+	$(INSTALL) cython
+	# PyZMQ sdist bundles don't play nice with pypi2rpm.
+	# We need to build from a checkout of the tag.
+	# Also install it into the build env so gevent_zeromq will build.
+	wget -O ${BUILD_TMP}/pyzmq-2.1.11.tar.gz https://github.com/zeromq/pyzmq/tarball/v2.1.11
+	bin/pip install ${BUILD_TMP}/pyzmq-2.1.11.tar.gz
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms ${BUILD_TMP}/pyzmq-2.1.11.tar.gz
+	rm -f ${BUILD_TMP}/pyzmq-2.1.11.tar.gz
+	# We need some extra patches to gevent_zeromq, use our forked version.
+	# Explicitly set PYTHONPATH for the build so that it picks up the local
+	# version of PyZMQ that we built above.
+	wget -O ${BUILD_TMP}/gevent-zeromq.zip https://github.com/mozilla-services/gevent-zeromq/zipball/532d3df654233f1b91e58a52be709475c0cd49da
+	bin/pip install ${BUILD_TMP}/gevent-zeromq.zip
+	PYTHONPATH=$(CURDIR)/lib/*/site-packages $(PYPI2RPM) ${BUILD_TMP}/gevent-zeromq.zip --dist-dir=$(CURDIR)/rpms
+	rm -f ${BUILD_TMP}/gevent-zeromq.zip
 
 mock: build build_rpms
 	mock init
