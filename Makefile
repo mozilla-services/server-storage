@@ -16,6 +16,7 @@ PYPI2RPM = bin/pypi2rpm.py --index=$(PYPI)
 PYPIOPTIONS = -i $(PYPI)
 BUILDAPP = bin/buildapp
 BUILDRPMS = bin/buildrpms
+BUILD_TMP = /tmp/server-storage-build.${USER}
 PYPI = http://pypi.python.org/simple
 PYPI2RPM = bin/pypi2rpm.py --index=$(PYPI)
 PYPIOPTIONS = -i $(PYPI)
