@@ -66,9 +66,10 @@ cover:
 	$(NOSE) --with-coverage --cover-html --cover-package=syncstorage $(TESTS)
 
 build_rpms:
-	$(BUILDRPMS) -c $(RPM_CHANNEL) $(PYPIOPTIONS) $(DEPS)
-	$(INSTALL) cython
 	mkdir -p ${BUILD_TMP}
+	$(BUILDRPMS) -c $(RPM_CHANNEL) $(PYPIOPTIONS) $(DEPS)
+	# Install cython for zmq-related builds.
+	$(INSTALL) cython
 	# PyZMQ sdist bundles don't play nice with pypi2rpm.
 	# We need to build from a checkout of the tag.
 	# Also install it into the build env so gevent_zeromq will build.
