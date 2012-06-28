@@ -48,6 +48,7 @@ from services.util import round_time, batch, HTTPJsonBadRequest
 from services.formatters import convert_response, json_response
 from services.respcodes import (WEAVE_MALFORMED_JSON, WEAVE_INVALID_WBO,
                                 WEAVE_INVALID_WRITE, WEAVE_OVER_QUOTA)
+from services import logger
 from syncstorage.wbo import WBO
 from syncstorage.storage import StorageConflictError
 
@@ -61,7 +62,6 @@ class StorageController(object):
 
     def __init__(self, app):
         self.app = app
-        self.logger = self.app.logger
         self.batch_size = app.config.get('storage.batch_size', 100)
         self.batch_max_count = app.config.get('storage.batch_max_count',
                                               100)
@@ -408,8 +408,8 @@ class StorageController(object):
 
             except Exception, e:   # we want to swallow the 503 in that case
                 # something went wrong
-                self.logger.error('Could not set items')
-                self.logger.error(str(e))
+                logger.error('Could not set items')
+                logger.error(str(e))
                 for wbo in wbos:
                     res['failed'][wbo['id']] = str(e)
             else:
