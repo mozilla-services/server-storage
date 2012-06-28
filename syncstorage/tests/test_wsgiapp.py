@@ -60,3 +60,4 @@ class TestWSGIApp(unittest.TestCase):
         self.assertEquals(self.app.get_storage(request).sqluri,
                           "sqlite:////tmp/another-test-host.db")
         os.unlink("/tmp/another-test-host.db")
+
