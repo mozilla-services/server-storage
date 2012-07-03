@@ -55,6 +55,11 @@ build:
 	$(INSTALL) coverage
 	$(INSTALL) WebTest
 	$(BUILDAPP) -c $(CHANNEL) $(PYPIOPTIONS) $(DEPS)
+	# NOTE: we don't install pyzmq and related dependencies here.
+	# They're not needed by default and they require extra system-level
+	# libraries to build.  If you want them, run `make build_rpms` and
+	# it will install them into the virtualenv.
+
 
 update:
 	$(BUILDAPP) -c $(CHANNEL) $(PYPIOPTIONS) $(DEPS)
