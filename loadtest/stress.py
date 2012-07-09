@@ -39,7 +39,6 @@ Load test for the Storage server
 import os
 import base64
 import random
-import socket
 import json
 import time
 
@@ -48,8 +47,9 @@ from funkload.utils import Data
 
 VERSION = '1.1'
 collections = ['bookmarks', 'forms', 'passwords', 'history', 'prefs', 'tabs']
-get_count_distribution = [0, 71, 15, 7, 4, 3] # 0% 0 GETs, 71% 1 GET, etc.
-post_count_distribution = [67, 18, 9, 4, 2]   # 67% 0 POSTs, 18% 1 POST, etc.
+get_count_distribution = [0, 71, 15, 7, 4, 3]  # 0% 0 GETs, 71% 1 GET, etc.
+post_count_distribution = [67, 18, 9, 4, 2]    # 67% 0 POSTs, 18% 1 POST, etc.
+
 
 class StressTest(FunkLoadTestCase):
 
@@ -79,7 +79,7 @@ class StressTest(FunkLoadTestCase):
                   (VERSION, username, collections[x])
             newer = int(time.time() - random.randint(3600, 360000))
             params = {"full": "1", "newer": str(newer)}
-            self.logd("about to GET (x=%d) %s" % (x, url));
+            self.logd("about to GET (x=%d) %s" % (x, url))
             response = self.get(url, params)
 
         # PUT requests with 100 WBOs batched together
@@ -96,7 +96,7 @@ class StressTest(FunkLoadTestCase):
                 data.append(wbo)
             data = json.dumps(data)
             data = Data('application/json', data)
-            self.logd("about to POST (x=%d) %s" % (x, url));
+            self.logd("about to POST (x=%d) %s" % (x, url))
             response = self.post(url, params=data)
             body = response.body
             self.assertTrue(body != '')
