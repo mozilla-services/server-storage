@@ -61,7 +61,8 @@ class TestMetlog(unittest.TestCase):
         self.assertEqual(msg1.get('type'), 'counter')
         msg2 = json.loads(sender.msgs[2])
         self.assertEqual(msg2.get('type'), 'services')
-        self.assertEqual(msg2.get('fields'), {'user_agent': 'None'})
+        self.assertEqual(msg2['fields']['userid'], self.username)
+        self.assertTrue('req_time' in msg2['fields'])
 
     def test_addl_services_data(self):
         path = '/1.1/%s/info/collections' % self.username
@@ -89,6 +90,7 @@ class TestMetlog(unittest.TestCase):
         msg2 = json.loads(sender.msgs[2])
         self.assertEqual(msg2.get('type'), 'services')
         expected = data.copy()
-        expected['user_agent'] = 'USER_AGENT'
-        self.assertEqual(msg2.get('fields'), expected)
+        expected['userid'] = self.username
+        expected['req_time'] = msg2['fields']['req_time']
+        self.assertEqual(msg2['fields'], expected)
         wrapped_method._fn._fn._fn = orig_inner
