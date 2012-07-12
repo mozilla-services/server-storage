@@ -570,6 +570,15 @@ class TestStorage(support.TestWsgiApp):
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 3)
 
+        # also populate some items that get special caching treatment.
+        wbo = {'payload': _PLD}
+        self.app.put_json(self.root + '/storage/meta/global', wbo)
+        self.app.put_json(self.root + '/storage/tabs/home', wbo)
+        res = self.app.get(self.root + '/storage/meta/global')
+        self.assertEquals(res.json["payload"], _PLD)
+        res = self.app.get(self.root + '/storage/tabs/home')
+        self.assertEquals(res.json["payload"], _PLD)
+
         # deleting all with no confirmation
         self.app.delete(self.root + '/storage', status=400)
 
@@ -579,6 +588,8 @@ class TestStorage(support.TestWsgiApp):
         res = json.loads(res.body)
         res = self.app.get(self.root + '/storage/col2')
         self.assertEquals(len(res.json), 0)
+        self.app.get(self.root + '/storage/meta/global', status=404)
+        self.app.get(self.root + '/storage/tabs/home', status=404)
 
     def test_x_weave_timestamp(self):
         if self.distant:

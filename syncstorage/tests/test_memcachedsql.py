@@ -328,21 +328,28 @@ if MEMCACHED:
             res = self.storage.get_item(_UID, 'col1', '1')
             self.assertEquals(res['payload'], _PLD)
 
-            # this should remove the cache
+            # this should remove the cache for that collection.
             self.storage.delete_items(_UID, 'col1')
             items = self.storage.get_items(_UID, 'col1')
             self.assertEquals(len(items), 0)
 
+            # populate it again, along with some data that gets
+            # special treatment by memcache.
             self.storage.set_item(_UID, 'col1', '1', payload=_PLD)
             self.storage.set_item(_UID, 'col1', '2', payload=_PLD)
             self.storage.set_item(_UID, 'col1', '3', payload=_PLD)
-            self.storage.set_item(_UID, 'col2', '4', payload=_PLD)
+            self.storage.set_item(_UID, 'meta', 'global', payload=_PLD)
+            self.storage.set_item(_UID, 'tabs', 'home', payload=_PLD)
 
             items = self.storage.get_items(_UID, 'col1')
             self.assertEquals(len(items), 3)
 
             self.storage.delete_storage(_UID)
             items = self.storage.get_items(_UID, 'col1')
+            self.assertEquals(len(items), 0)
+            items = self.storage.get_items(_UID, 'meta')
+            self.assertEquals(len(items), 0)
+            items = self.storage.get_items(_UID, 'tabs')
             self.assertEquals(len(items), 0)
 
             stamps = self.storage.get_collection_timestamps(_UID)
