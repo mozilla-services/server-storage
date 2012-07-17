@@ -56,11 +56,33 @@ class StressTest(FunkLoadTestCase):
     def setUp(self):
         pass
 
+    def get(self, url, *args, **kwds):
+        self.logi("GET: " + url)
+        try:
+            result = super(StressTest, self).get(url, *args, **kwds)
+        except Exception, e:
+            self.logi("    FAIL: " + repr(e))
+            raise
+        else:
+            self.logi("    OK: " + repr(result))
+            return result
+
+    def post(self, url, *args, **kwds):
+        self.logi("POST: " + url)
+        try:
+            result = super(StressTest, self).post(url, *args, **kwds)
+        except Exception, e:
+            self.logi("    FAIL: " + repr(e))
+            raise
+        else:
+            self.logi("    OK: " + repr(result))
+            return result
+
     def test_storage_session(self):
         username = self._pick_user()
         password = "password"
         node = self._pick_node()
-        self.logd("choosing node %s" % (node))
+        self.logi("choosing node %s" % (node))
         self.setBasicAuth(username, password)
 
         # GET /username/info/collections
@@ -68,25 +90,25 @@ class StressTest(FunkLoadTestCase):
         url = node + "/%s/%s/info/collections" % (VERSION, username)
         response = self.get(url)
 
-        c = collections[:]
-        random.shuffle(c)
+        shuffled_collections = collections[:]
+        random.shuffle(shuffled_collections)
 
         # GET requests
         self.setOkCodes([200, 404])
         # we subtract 1 because we already did a GET on info/collections
         for x in range(self._pick_weighted_count(get_count_distribution) - 1):
             url = node + "/%s/%s/storage/%s" % \
-                  (VERSION, username, collections[x])
+                  (VERSION, username, shuffled_collections[x])
             newer = int(time.time() - random.randint(3600, 360000))
             params = {"full": "1", "newer": str(newer)}
-            self.logd("about to GET (x=%d) %s" % (x, url))
+            self.logi("about to GET (x=%d) %s" % (x, url))
             response = self.get(url, params)
 
         # PUT requests with 100 WBOs batched together
         self.setOkCodes([200])
         for x in range(self._pick_weighted_count(post_count_distribution)):
             url = node + "/%s/%s/storage/%s" % \
-                  (VERSION, username, collections[x])
+                  (VERSION, username, shuffled_collections[x])
             payload = username * random.randint(50, 200)
             data = []
             for i in range(100):
@@ -96,10 +118,13 @@ class StressTest(FunkLoadTestCase):
                 data.append(wbo)
             data = json.dumps(data)
             data = Data('application/json', data)
-            self.logd("about to POST (x=%d) %s" % (x, url))
+            self.logi("about to POST (x=%d) %s" % (x, url))
             response = self.post(url, params=data)
             body = response.body
             self.assertTrue(body != '')
+            result = json.loads(body)
+            self.assertEquals(len(result["success"]), 100)
+            self.assertEquals(len(result["failed"]), 0)
 
     def _pick_node(self):
         node = None
