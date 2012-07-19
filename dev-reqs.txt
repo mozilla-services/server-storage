@@ -16,14 +16,10 @@ recaptcha-client
 pylibmc
 pymysql_sa
 gevent
-# gevent_zeromq and pyzmq packages don't work w/ pypi2rpm, so we build from
-# source in the Makefile
-#gevent_zeromq
-#pyzmq
 greenlet
 PyMySQL
 repoze.lru
 repoze.who
 zope.deprecation
 zope.interface
-metlog-py >= 0.9.1
+metlog-py >= 0.9.3

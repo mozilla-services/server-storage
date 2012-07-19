@@ -15,7 +15,7 @@ Prefix: %{_prefix}
 BuildArch: noarch
 Vendor: Tarek Ziade <tarek@mozilla.com>
 BuildRequires: libevent-devel libmemcached-devel
-Requires: nginx memcached gunicorn logstash-metlog >= 0.7 python26 python26-pylibmc python26-setuptools python26-webob python26-paste python26-pastedeploy python26-services >= 1.0 python26-pastescript python26-sqlalchemy python26-simplejson python26-cef python26-gevent python26-pymysql python26-pymysql_sa python26-greenlet python26-metlog-py python26-pyzmq python26-gevent_zeromq
+Requires: nginx memcached gunicorn logstash-metlog >= 0.8.3 python26 python26-pylibmc python26-setuptools python26-webob python26-paste python26-pastedeploy python26-services >= 1.0 python26-pastescript python26-sqlalchemy python26-simplejson python26-cef python26-gevent python26-pymysql python26-pymysql_sa python26-greenlet python26-metlog-py
 Conflicts: python26-syncreg
 Url: https://hg.mozilla.org/services/server-storage
 
