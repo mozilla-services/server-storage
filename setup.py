@@ -38,7 +38,7 @@ import os
 import re
 
 
-install_requires = ['SQLALchemy<=0.6.99', 'PasteDeploy', 'WebOb',
+install_requires = ['SQLAlchemy', 'PasteDeploy', 'WebOb',
                     'Routes', 'simplejson', 'cef',
                     'Services>=1.0']
 
