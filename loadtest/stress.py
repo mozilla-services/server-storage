@@ -61,10 +61,10 @@ class StressTest(FunkLoadTestCase):
         try:
             result = super(StressTest, self).get(url, *args, **kwds)
         except Exception, e:
-            self.logi("    FAIL: " + repr(e))
+            self.logi("    FAIL: " + url + " " + repr(e))
             raise
         else:
-            self.logi("    OK: " + repr(result))
+            self.logi("    OK: " + url + " " + repr(result))
             return result
 
     def post(self, url, *args, **kwds):
@@ -72,10 +72,10 @@ class StressTest(FunkLoadTestCase):
         try:
             result = super(StressTest, self).post(url, *args, **kwds)
         except Exception, e:
-            self.logi("    FAIL: " + repr(e))
+            self.logi("    FAIL: " + url + " " + repr(e))
             raise
         else:
-            self.logi("    OK: " + repr(result))
+            self.logi("    OK: " + url + " " + repr(result))
             return result
 
     def test_storage_session(self):
@@ -111,7 +111,8 @@ class StressTest(FunkLoadTestCase):
                   (VERSION, username, shuffled_collections[x])
             payload = username * random.randint(50, 200)
             data = []
-            for i in range(100):
+            items_per_batch = 10
+            for i in range(items_per_batch):
                 id = base64.b64encode(os.urandom(10))
                 id += str(time.time() % 100)
                 wbo = {'id': id, 'payload': payload}
@@ -123,14 +124,17 @@ class StressTest(FunkLoadTestCase):
             body = response.body
             self.assertTrue(body != '')
             result = json.loads(body)
-            self.assertEquals(len(result["success"]), 100)
+            self.assertEquals(len(result["success"]), items_per_batch)
             self.assertEquals(len(result["failed"]), 0)
 
     def _pick_node(self):
         node = None
-        # 41 <= node <= 50 sync5.db.scl2.stage down
-        while node is None or (node >= 41 and node <= 50):
+        while True:
             node = random.randint(1, 80)
+            # sync1.db is down?
+            #if 1 <= node <= 10:
+            #    continue
+            break
         return "https://stage-sync%i.services.mozilla.com" % node
 
     def _pick_user(self):
