@@ -74,6 +74,10 @@ class WBO(dict):
             if value is None:
                 continue
 
+            # Ensure we only have string keys, not unicode.
+            # We know that "name" is one of a specific set of string-safe
+            # values, so this converstion is safe.
+            name = str(name)
             self[name] = value
 
     def validate(self):
