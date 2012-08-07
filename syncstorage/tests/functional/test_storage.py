@@ -291,7 +291,7 @@ class TestStorage(support.TestWsgiApp):
     def test_alternative_formats(self):
         # application/json
         res = self.app.get(self.root + '/storage/col2')
-        self.assertEquals(res.content_type, 'application/json')
+        self.assertEquals(res.content_type.split(";")[0], 'application/json')
 
         res = res.json
         res.sort()
@@ -300,7 +300,7 @@ class TestStorage(support.TestWsgiApp):
         # application/newlines
         res = self.app.get(self.root + '/storage/col2',
                            headers=[('Accept', 'application/newlines')])
-        self.assertEquals(res.content_type, 'application/newlines')
+        self.assertEquals(res.content_type.split(";")[0], 'application/newlines')
 
         res = [json.loads(line) for line in res.body.strip().split('\n')]
         res.sort()
@@ -309,7 +309,7 @@ class TestStorage(support.TestWsgiApp):
         # application/whoisi
         res = self.app.get(self.root + '/storage/col2',
                            headers=[('Accept', 'application/whoisi')])
-        self.assertEquals(res.content_type, 'application/whoisi')
+        self.assertEquals(res.content_type.split(";")[0], 'application/whoisi')
 
         lines = []
         pos = 0
@@ -329,7 +329,7 @@ class TestStorage(support.TestWsgiApp):
         # unkown format defaults to json
         res = self.app.get(self.root + '/storage/col2',
                         headers=[('Accept', 'application/xxx')])
-        self.assertEquals(res.content_type, 'application/json')
+        self.assertEquals(res.content_type.split(";")[0], 'application/json')
 
     def test_get_item(self):
         # grabbing object 1 from col2
