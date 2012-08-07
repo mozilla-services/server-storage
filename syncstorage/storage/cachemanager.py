@@ -47,8 +47,8 @@ import thread
 from pylibmc import Client, NotFound, ThreadMappedPool
 from pylibmc import Error as MemcachedError
 
+from metlog.holder import CLIENT_HOLDER
 from services.util import BackendError
-from services import logger
 from services.events import REQUEST_ENDS, subscribe
 
 from syncstorage.storage.sql import _KB
@@ -70,6 +70,7 @@ class CacheManager(object):
         # when several clients for the same user
         # get/set the cached data
         self._locker = threading.RLock()
+        self.logger = CLIENT_HOLDER.default_client
         subscribe(REQUEST_ENDS, self._cleanup_pool)
 
     def _cleanup_pool(self, response):
@@ -249,7 +250,7 @@ class CacheManager(object):
             try:
                 self.delete(_key(user_id, key))
             except BackendError:
-                logger.error('Could not delete user cache (%s)' % key)
+                self.logger.error('Could not delete user cache (%s)' % key)
 
     #
     # total managment
@@ -262,7 +263,7 @@ class CacheManager(object):
         try:
             self.set(key, total)
         except BackendError:
-            logger.error('Could not write to memcached')
+            self.logger.error('Could not write to memcached')
 
     def get_total(self, user_id):
         try:
