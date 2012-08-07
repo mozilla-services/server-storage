@@ -66,7 +66,8 @@ chmod 640 %{_localstatedir}/log/syncstorage.log
 
 %dir %{_sysconfdir}/sync/
 
-%config(noreplace) %{_sysconfdir}/sync/*
+%config(noreplace) %{_sysconfdir}/sync/sync.conf
+%config(noreplace) %{_sysconfdir}/sync/production.ini
 %config(noreplace) %{_sysconfdir}/nginx/conf.d/syncstorage.conf
 
 %defattr(-,root,root)
