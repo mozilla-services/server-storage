@@ -16,7 +16,7 @@ recaptcha-client == 1.0.6
 pylibmc == 1.2.3
 pymysql_sa == 1.0
 gevent == 0.13.7
-greenlet == 0.3.4
+greenlet == 0.4
 PyMySQL == 0.5
 repoze.lru == 0.5
 repoze.who == 2.0
