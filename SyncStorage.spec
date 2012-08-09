@@ -1,7 +1,7 @@
 %define name python26-syncstorage
 %define pythonname SyncStorage
 %define version 1.13
-%define release 4
+%define release 5
 
 Summary: Sync Storage server
 Name: %{name}

@@ -40,7 +40,7 @@ from tempfile import mkstemp
 import os
 
 try:
-    import pylibmc
+    import pylibmc  # NOQA
 except ImportError:
     MEMCACHED = False
 else:
@@ -69,7 +69,7 @@ if MEMCACHED:
             # Ensure we have metlog loaded so the timers will work.
             config_file = os.path.join(os.path.dirname(__file__), "sync.conf")
             config = Config(cfgfile=config_file)
-            load_and_configure(config, "metlog_loader") 
+            load_and_configure(config, "metlog_loader")
 
             fd, self.dbfile = mkstemp()
             os.close(fd)
@@ -403,7 +403,8 @@ if MEMCACHED:
 
             # Now it should recalculate when asked for the size.
             self.assertEquals(sqlstorage.get_total_size(_UID), 0)
-            self.assertEquals(storage.get_total_size(_UID, False), payload_size)
+            self.assertEquals(storage.get_total_size(_UID, False),
+                              payload_size)
             self.assertEquals(storage.get_total_size(_UID, True), 0)
 
 
