@@ -48,6 +48,7 @@ from pylibmc import Client, NotFound, ThreadMappedPool
 from pylibmc import Error as MemcachedError
 
 from metlog.holder import CLIENT_HOLDER
+
 from services.util import BackendError
 from services.events import REQUEST_ENDS, subscribe
 
@@ -70,8 +71,11 @@ class CacheManager(object):
         # when several clients for the same user
         # get/set the cached data
         self._locker = threading.RLock()
-        self.logger = CLIENT_HOLDER.default_client
         subscribe(REQUEST_ENDS, self._cleanup_pool)
+
+    @property
+    def logger(self):
+        return CLIENT_HOLDER.default_client
 
     def _cleanup_pool(self, response):
         self.pool.pop(thread.get_ident(), None)
@@ -83,7 +87,8 @@ class CacheManager(object):
     def get(self, key):
         with self.pool.reserve() as mc:
             try:
-                return mc.get(key)
+                with self.logger.timer("syncstorage.storage.cachemanager.get"):
+                    return mc.get(key)
             except MemcachedError, err:
                 # memcache seems down
                 raise BackendError(str(err))
@@ -91,7 +96,8 @@ class CacheManager(object):
     def delete(self, key):
         with self.pool.reserve() as mc:
             try:
-                return mc.delete(key)
+                with self.logger.timer("syncstorage.storage.cachemanager.delete"):
+                    return mc.delete(key)
             except NotFound:
                 return False
             except MemcachedError, err:
@@ -102,7 +108,8 @@ class CacheManager(object):
         size = int(size)
         with self.pool.reserve() as mc:
             try:
-                return mc.incr(key, size)
+                with self.logger.timer("syncstorage.storage.cachemanager.incr"):
+                    return mc.incr(key, size)
             except NotFound:
                 return mc.set(key, size)
             except MemcachedError, err:
@@ -111,8 +118,9 @@ class CacheManager(object):
     def set(self, key, value):
         with self.pool.reserve() as mc:
             try:
-                if not mc.set(key, value):
-                    raise BackendError()
+                with self.logger.timer("syncstorage.storage.cachemanager.set"):
+                    if not mc.set(key, value):
+                        raise BackendError()
             except MemcachedError, err:
                 raise BackendError(str(err))
 

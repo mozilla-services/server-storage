@@ -64,6 +64,8 @@ from sqlalchemy.sql.expression import _generative, Delete, _clone, ClauseList
 from sqlalchemy import util
 from sqlalchemy.sql.compiler import SQLCompiler
 
+from metlog.holder import CLIENT_HOLDER
+
 from syncstorage.storage import StorageConflictError
 from syncstorage.storage.queries import get_query
 from syncstorage.storage.sqlmappers import (tables, users, collections,
@@ -261,6 +263,10 @@ class SQLStorage(object):
         # in the database on every request.
         self._temp_cache = defaultdict(dict)
 
+    @property
+    def logger(self):
+        return CLIENT_HOLDER.default_client
+
     @classmethod
     def get_name(cls):
         """Return the name of the storage plugin"""
@@ -268,28 +274,31 @@ class SQLStorage(object):
 
     def _do_query(self, *args, **kwds):
         """Execute a database query, returning the rowcount."""
-        res = safe_execute(self._engine, *args, **kwds)
-        try:
-            return res.rowcount
-        finally:
-            res.close()
+        with self.logger.timer("syncstorage.storage.sql.safe_execute"):
+            res = safe_execute(self._engine, *args, **kwds)
+            try:
+                return res.rowcount
+            finally:
+                res.close()
 
     def _do_query_fetchone(self, *args, **kwds):
         """Execute a database query, returning the first result."""
-        res = safe_execute(self._engine, *args, **kwds)
-        try:
-            return res.fetchone()
-        finally:
-            res.close()
+        with self.logger.timer("syncstorage.storage.sql.safe_execute"):
+            res = safe_execute(self._engine, *args, **kwds)
+            try:
+                return res.fetchone()
+            finally:
+                res.close()
 
     def _do_query_fetchall(self, *args, **kwds):
         """Execute a database query, returning iterator over the results."""
-        res = safe_execute(self._engine, *args, **kwds)
-        try:
-            for row in res:
-                yield row
-        finally:
-            res.close()
+        with self.logger.timer("syncstorage.storage.sql.safe_execute"):
+            res = safe_execute(self._engine, *args, **kwds)
+            try:
+                for row in res:
+                    yield row
+            finally:
+                res.close()
 
     #
     # Users APIs

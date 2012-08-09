@@ -51,7 +51,10 @@ else:
 
 from syncstorage.storage import SyncStorage
 from syncstorage.controller import _ONE_MEG
+
 from services.util import BackendError, round_time
+from services.config import Config
+from services.pluginreg import load_and_configure
 
 _UID = 1
 _PLD = '*' * 500
@@ -63,6 +66,11 @@ if MEMCACHED:
     class TestMemcachedSQLStorage(unittest.TestCase):
 
         def setUp(self):
+            # Ensure we have metlog loaded so the timers will work.
+            config_file = os.path.join(os.path.dirname(__file__), "sync.conf")
+            config = Config(cfgfile=config_file)
+            load_and_configure(config, "metlog_loader") 
+
             fd, self.dbfile = mkstemp()
             os.close(fd)
 
