@@ -40,12 +40,14 @@ from tempfile import mkstemp
 import os
 
 try:
-    from syncstorage.storage.memcachedsql import MemcachedSQLStorage
-    from syncstorage.storage.memcachedsql import QUOTA_RECALCULATION_PERIOD
-    from syncstorage.storage.memcachedsql import _KB
-    MEMCACHED = True
+    import pylibmc
 except ImportError:
     MEMCACHED = False
+else:
+    MEMCACHED = True
+    from syncstorage.storage.memcachedsql import MemcachedSQLStorage
+    from syncstorage.storage.memcachedsql import QUOTA_RECALCULATION_PERIOD
+    from syncstorage.storage.cachemanager import _KB
 
 from syncstorage.storage import SyncStorage
 from syncstorage.controller import _ONE_MEG
