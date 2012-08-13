@@ -46,9 +46,28 @@ from funkload.FunkLoadTestCase import FunkLoadTestCase
 from funkload.utils import Data
 
 VERSION = '1.1'
-collections = ['bookmarks', 'forms', 'passwords', 'history', 'prefs', 'tabs']
-get_count_distribution = [0, 71, 15, 7, 4, 3]  # 0% 0 GETs, 71% 1 GET, etc.
-post_count_distribution = [67, 18, 9, 4, 2]    # 67% 0 POSTs, 18% 1 POST, etc.
+
+# The collections to operate on.
+# Each operation will randomly select a collection from this list.
+# The "tabs" collection is not included since it uses memcache; we need
+# to figure out a way to test it without overloading the server.
+collections = ['bookmarks', 'forms', 'passwords', 'history', 'prefs']
+
+# The distribution of GET operations to meta/global per test run.
+# 40% will do 0 GETs, 60% will do 1 GET, etc...
+metaglobal_count_distribution = [40, 60, 0, 0, 0]
+
+# The distribution of GET operations per test run.
+# 71% will do 0 GETs, 15% will do 1 GET, etc...
+get_count_distribution = [71, 15, 7, 4, 3]
+
+# The distribution of POST operations per test run.
+# 67% will do 0 POSTs, 18% will do 1 POST, etc...
+post_count_distribution = [67, 18, 9, 4, 2]
+
+# The distribution of DELETE operations per test run.
+# 99% will do 0 DELETEs, 1% will do 1 DELETE, etc...
+delete_count_distribution = [99, 1, 0, 0, 0]
 
 
 class StressTest(FunkLoadTestCase):
@@ -56,26 +75,17 @@ class StressTest(FunkLoadTestCase):
     def setUp(self):
         pass
 
-    def get(self, url, *args, **kwds):
-        self.logi("GET: " + url)
+    def _browse(self, url_in, params_in=None, description=None, ok_codes=None,
+                method='post', *args, **kwds):
+        args = (url_in, params_in, description, ok_codes, method) + args
+        self.logi("%s: %s" % (method.upper(), url_in))
         try:
-            result = super(StressTest, self).get(url, *args, **kwds)
+            result = super(StressTest, self)._browse(*args, **kwds)
         except Exception, e:
-            self.logi("    FAIL: " + url + " " + repr(e))
+            self.logi("    FAIL: " + url_in + " " + repr(e))
             raise
         else:
-            self.logi("    OK: " + url + " " + repr(result))
-            return result
-
-    def post(self, url, *args, **kwds):
-        self.logi("POST: " + url)
-        try:
-            result = super(StressTest, self).post(url, *args, **kwds)
-        except Exception, e:
-            self.logi("    FAIL: " + url + " " + repr(e))
-            raise
-        else:
-            self.logi("    OK: " + url + " " + repr(result))
+            self.logi("    OK: " + url_in + " " + repr(result))
             return result
 
     def test_storage_session(self):
@@ -85,36 +95,48 @@ class StressTest(FunkLoadTestCase):
         self.logi("choosing node %s" % (node))
         self.setBasicAuth(username, password)
 
-        # GET /username/info/collections
+        # Always GET /username/info/collections
         self.setOkCodes([200, 404])
         url = node + "/%s/%s/info/collections" % (VERSION, username)
         response = self.get(url)
 
-        shuffled_collections = collections[:]
-        random.shuffle(shuffled_collections)
-
-        # GET requests
+        # GET requests to meta/global.
+        num_requests = self._pick_weighted_count(metaglobal_count_distribution)
         self.setOkCodes([200, 404])
-        # we subtract 1 because we already did a GET on info/collections
-        for x in range(self._pick_weighted_count(get_count_distribution) - 1):
-            url = node + "/%s/%s/storage/%s" % \
-                  (VERSION, username, shuffled_collections[x])
+        for x in range(num_requests):
+            url = node + "/%s/%s/storage/meta/global" % (VERSION, username)
+            response = self.get(url)
+            if response.code == 404:
+                metapayload = "This is the metaglobal payload which contains"\
+                              " some client data that doesnt look much"\
+                              " like this"
+                data = json.dumps({"id": "global", "payload": metapayload})
+                data = Data('application/json', data)
+                self.put(url, params=data)
+
+        # GET requests to individual collections.
+        num_requests = self._pick_weighted_count(get_count_distribution)
+        cols = random.sample(collections, num_requests)
+        self.setOkCodes([200, 404])
+        for x in range(num_requests):
+            url = node + "/%s/%s/storage/%s" % (VERSION, username, cols[x])
             newer = int(time.time() - random.randint(3600, 360000))
             params = {"full": "1", "newer": str(newer)}
             self.logi("about to GET (x=%d) %s" % (x, url))
             response = self.get(url, params)
 
         # PUT requests with 100 WBOs batched together
+        num_requests = self._pick_weighted_count(post_count_distribution)
+        cols = random.sample(collections, num_requests)
         self.setOkCodes([200])
-        for x in range(self._pick_weighted_count(post_count_distribution)):
-            url = node + "/%s/%s/storage/%s" % \
-                  (VERSION, username, shuffled_collections[x])
-            payload = username * random.randint(50, 200)
+        for x in range(num_requests):
+            url = node + "/%s/%s/storage/%s" % (VERSION, username, cols[x])
             data = []
             items_per_batch = 10
             for i in range(items_per_batch):
                 id = base64.b64encode(os.urandom(10))
                 id += str(time.time() % 100)
+                payload = username * random.randint(50, 200)
                 wbo = {'id': id, 'payload': payload}
                 data.append(wbo)
             data = json.dumps(data)
@@ -126,6 +148,14 @@ class StressTest(FunkLoadTestCase):
             result = json.loads(body)
             self.assertEquals(len(result["success"]), items_per_batch)
             self.assertEquals(len(result["failed"]), 0)
+
+        # DELETE requests to individual collections.
+        num_requests = self._pick_weighted_count(delete_count_distribution)
+        cols = random.sample(collections, num_requests)
+        self.setOkCodes([200])
+        for x in range(num_requests):
+            url = node + "/%s/%s/storage/%s" % (VERSION, username, cols[x])
+            self.delete(url)
 
     def _pick_node(self):
         node = None
