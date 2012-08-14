@@ -56,7 +56,6 @@ import urlparse
 from time import time
 from collections import defaultdict
 
-from sqlalchemy import create_engine
 from sqlalchemy.sql import (text as sqltext, select, bindparam, insert, update,
                             and_)
 from sqlalchemy.exc import IntegrityError
@@ -73,7 +72,8 @@ from syncstorage.storage.sqlmappers import (tables, users, collections,
                                             get_wbo_table,
                                             get_wbo_table_byindex)
 from syncstorage.storage.sqlmappers import wbo as _wbo
-from services.util import time2bigint, bigint2time, safe_execute, round_time
+from services.util import (time2bigint, bigint2time, round_time,
+                           safe_execute, create_engine)
 from syncstorage.wbo import WBO
 
 
