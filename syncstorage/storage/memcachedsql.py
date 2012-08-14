@@ -321,7 +321,7 @@ class MemcachedSQLStorage(SQLStorage):
         if not size:    # memcached server seems down or needs a reset
             return _get_set_size()
 
-        return  size
+        return size
 
     def get_size_left(self, user_id, recalculate=False):
         """Returns the storage left for a user"""

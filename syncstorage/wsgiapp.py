@@ -160,8 +160,8 @@ class StorageServerApp(SyncServerApp):
         if storage.get_name() in ('memcached',):
             cache_servers = ['%s:%d' % (server.ip, server.port)
                              for server in storage.cache.servers]
-            res.append('- memcached servers: %s</li>' % \
-                    ', '.join(cache_servers))
+            res.append('- memcached servers: %s</li>' %
+                       ', '.join(cache_servers))
 
         if storage.get_name() in ('sql', 'memcached'):
             res.append('- sqluri: %s' % storage.sqluri)

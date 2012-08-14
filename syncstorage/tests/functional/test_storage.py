@@ -300,7 +300,8 @@ class TestStorage(support.TestWsgiApp):
         # application/newlines
         res = self.app.get(self.root + '/storage/col2',
                            headers=[('Accept', 'application/newlines')])
-        self.assertEquals(res.content_type.split(";")[0], 'application/newlines')
+        self.assertEquals(res.content_type.split(";")[0],
+                          'application/newlines')
 
         res = [json.loads(line) for line in res.body.strip().split('\n')]
         res.sort()

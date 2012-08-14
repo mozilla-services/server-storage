@@ -154,7 +154,7 @@ class StorageController(object):
                         'index_above': 'sortindex',
                         'index_below': 'sortindex'}
 
-        for arg in  ('older', 'newer', 'index_above', 'index_below'):
+        for arg in ('older', 'newer', 'index_above', 'index_below'):
             value = kw.get(arg)
             if value is None:
                 continue
