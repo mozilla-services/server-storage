@@ -44,13 +44,11 @@ Memcached + SQL backend
 import threading
 import thread
 
-from pylibmc import Client, NotFound, ThreadMappedPool
-from pylibmc import Error as MemcachedError
+import memcache
 
 from metlog.holder import CLIENT_HOLDER
 
 from services.util import BackendError
-from services.events import REQUEST_ENDS, subscribe
 
 from syncstorage.storage.sql import _KB
 
@@ -62,67 +60,49 @@ def _key(*args):
 
 
 class CacheManager(object):
-    """ Helpers on the top of pylibmc
-    """
-    def __init__(self, *args, **kw):
-        self._client = Client(*args, **kw)
-        self.pool = ThreadMappedPool(self._client)
+    """ Helpers on the top of python-memcached."""
+    def __init__(self, *args, **kwds):
+        # The Client class is transparently thread-local so we
+        # don't need to use a pool here.
+        self._client = memcache.Client(*args, **kwds)
         # using a locker to avoid race conditions
         # when several clients for the same user
         # get/set the cached data
         self._locker = threading.RLock()
-        subscribe(REQUEST_ENDS, self._cleanup_pool)
 
     @property
     def logger(self):
         return CLIENT_HOLDER.default_client
 
-    def _cleanup_pool(self, response):
-        self.pool.pop(thread.get_ident(), None)
-
     def flush_all(self):
-        with self.pool.reserve() as mc:
-            mc.flush_all()
+        self._client.flush_all()
 
     def get(self, key):
-        with self.pool.reserve() as mc:
-            try:
-                with self.logger.timer("syncstorage.storage.cachemanager.get"):
-                    return mc.get(key)
-            except MemcachedError, err:
-                # memcache seems down
-                raise BackendError(str(err))
+        with self.logger.timer("syncstorage.storage.cachemanager.get"):
+            # This will return None is the key is missing, but also
+            # if the server is down.  No way to detect errors.
+            return self._client.get(key)
 
     def delete(self, key):
-        with self.pool.reserve() as mc:
-            try:
-                with self.logger.timer("syncstorage.storage.cachemanager.delete"):
-                    return mc.delete(key)
-            except NotFound:
-                return False
-            except MemcachedError, err:
-                # memcache seems down
-                raise BackendError(str(err))
+        with self.logger.timer("syncstorage.storage.cachemanager.delete"):
+            if not self._client.delete(key):
+                raise BackendError("delete() failed")
+            return True
 
     def incr(self, key, size=1):
         size = int(size)
-        with self.pool.reserve() as mc:
-            try:
-                with self.logger.timer("syncstorage.storage.cachemanager.incr"):
-                    return mc.incr(key, size)
-            except NotFound:
-                return mc.set(key, size)
-            except MemcachedError, err:
-                raise BackendError(str(err))
+        with self.logger.timer("syncstorage.storage.cachemanager.incr"):
+            res = self._client.incr(key, size)
+            if res is None:
+                if not self._client.set(key, size):
+                    raise BackendError("set() failed")
+                res = size
+        return res
 
     def set(self, key, value):
-        with self.pool.reserve() as mc:
-            try:
-                with self.logger.timer("syncstorage.storage.cachemanager.set"):
-                    if not mc.set(key, value):
-                        raise BackendError()
-            except MemcachedError, err:
-                raise BackendError(str(err))
+        with self.logger.timer("syncstorage.storage.cachemanager.set"):
+            if not self._client.set(key, value):
+                raise BackendError("set() failed")
 
     def get_set(self, key, func):
         res = self.get(key)
