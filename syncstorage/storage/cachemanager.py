@@ -42,7 +42,6 @@ Memcached + SQL backend
 - The info/collections timestamp mapping is stored in "user_id:stamps"
 """
 import threading
-import thread
 
 import memcache
 
