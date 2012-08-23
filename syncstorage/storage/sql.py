@@ -506,7 +506,12 @@ class SQLStorage(object):
             return dict(data)
 
         collections = self._cache(user_id, 'collection_names', _coll)
-        return collections[collection_id]
+        try:
+            return collections[collection_id]
+        except KeyError:
+            msg = "User %d collection %d has no collection name."
+            msg += "  Possible database corruption?"
+            raise KeyError(msg % (user_id, collection_id))
 
     def get_collection_counts(self, user_id):
         """Return the collection counts for a given user"""
