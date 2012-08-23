@@ -656,7 +656,7 @@ class TestStorage(support.TestWsgiApp):
         res = self.app.put_json(self.root + '/storage/col2/12345', wbo,
                            status=400)
         # the body should be 14
-        self.assertEquals(res.headers['Content-Type'], 'application/json')
+        self.assertEquals(res.content_type.split(";")[0], 'application/json')
         self.assertEquals(res.json, WEAVE_OVER_QUOTA)
 
     def test_get_collection_ttl(self):
