@@ -49,6 +49,8 @@ else:
     from syncstorage.storage.memcachedsql import QUOTA_RECALCULATION_PERIOD
     from syncstorage.storage.cachemanager import _KB
 
+from nose import SkipTest
+
 from syncstorage.storage import SyncStorage
 from syncstorage.controller import _ONE_MEG
 
@@ -63,9 +65,13 @@ _PLD = '*' * 500
 if MEMCACHED:
     SyncStorage.register(MemcachedSQLStorage)
 
-    class TestMemcachedSQLStorage(unittest.TestCase):
+
+class TestMemcachedSQLStorage(unittest.TestCase):
 
         def setUp(self):
+            if not MEMCACHED:
+                raise SkipTest
+
             # Ensure we have metlog loaded so the timers will work.
             config_file = os.path.join(os.path.dirname(__file__), "sync.conf")
             config = Config(cfgfile=config_file)
@@ -103,7 +109,7 @@ if MEMCACHED:
 
         def test_basic(self):
             if not self._is_up():
-                return
+                raise SkipTest
             # just make sure calls goes through
             self.storage.set_user(_UID, email='tarek@ziade.org')
             self.storage.set_collection(_UID, 'col1')
@@ -120,7 +126,7 @@ if MEMCACHED:
 
         def test_meta_global(self):
             if not self._is_up():
-                return
+                raise SkipTest
             self.storage.set_user(_UID, email='tarek@ziade.org')
             self.storage.set_collection(_UID, 'meta')
             self.storage.set_item(_UID, 'meta', 'global', payload=_PLD)
@@ -169,7 +175,7 @@ if MEMCACHED:
 
         def test_tabs(self):
             if not self._is_up():  # no memcached == no tabs
-                return
+                raise SkipTest
 
             self.storage.set_user(_UID, email='tarek@ziade.org')
             self.storage.set_collection(_UID, 'tabs')
@@ -203,7 +209,7 @@ if MEMCACHED:
         def test_size(self):
             # make sure we get the right size
             if not self._is_up():  # no memcached == no size
-                return
+                raise SkipTest
 
             # storing 2 WBOs
             self.storage.set_user(_UID, email='tarek@ziade.org')
@@ -410,8 +416,7 @@ if MEMCACHED:
 
 def test_suite():
     suite = unittest.TestSuite()
-    if MEMCACHED:
-        suite.addTest(unittest.makeSuite(TestMemcachedSQLStorage))
+    suite.addTest(unittest.makeSuite(TestMemcachedSQLStorage))
     return suite
 
 if __name__ == "__main__":

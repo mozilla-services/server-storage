@@ -50,6 +50,8 @@ import simplejson as json
 from decimal import Decimal
 from tempfile import mkstemp
 
+from nose import SkipTest
+
 from syncstorage.tests.functional import support
 
 from services.respcodes import WEAVE_OVER_QUOTA, WEAVE_INVALID_WBO
@@ -711,16 +713,17 @@ class TestStorage(support.TestWsgiApp):
     def test_blacklisted_nodes(self):
         # This can't be run against a live server.
         if self.distant:
-            return
+            raise SkipTest
+
         app = get_app(self.app)
         old = app.config.get('storage.check_blacklisted_nodes', False)
         app.config['storage.check_blacklisted_nodes'] = True
         try:
             if app.cache is None:
-                return   # memcached is probably not installed
+                raise SkipTest   # memcached is probably not installed
 
             if not app.cache.set('TEST', 1):
-                return   # memcached server is probably down
+                raise SkipTest   # memcached server is probably down
 
             # "backoff:server" will add a X-Weave-Backoff header
             app.cache.set('backoff:localhost:80', 2)
@@ -887,12 +890,13 @@ class TestStorage(support.TestWsgiApp):
     def test_write_tabs_503(self):
         # This can't be run against a live server.
         if self.distant:
-            return True
+            raise SkipTest
+
         # make sure a tentative to write in tabs w/ memcached leads to a 503
         try:
             from syncstorage.storage.memcachedsql import MemcachedSQLStorage
         except ImportError:
-            return
+            raise SkipTest
 
         class BadCache(object):
             def incr(*args, **kw):
@@ -940,7 +944,8 @@ class TestStorage(support.TestWsgiApp):
     def test_debug_screen(self):
         # This can't be run against a live server.
         if self.distant:
-            return
+            raise SkipTest
+
         # deactivated by default
         self.app.get(self.root + '/__debug__', status=404)
         # let's activate it
@@ -953,7 +958,8 @@ class TestStorage(support.TestWsgiApp):
     def test_batch_size(self):
         # This can't be run against a live server.
         if self.distant:
-            return
+            raise SkipTest
+
         # check that the batch size is correctly set
         size = get_app(self.app).controllers['storage'].batch_size
         self.assertEqual(size, 25)
