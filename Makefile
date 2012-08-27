@@ -71,6 +71,7 @@ cover:
 	$(NOSE) --with-coverage --cover-html --cover-package=syncstorage $(TESTS)
 
 build_rpms:
+	rm -rf rpms
 	mkdir -p ${BUILD_TMP}
 	$(BUILDRPMS) -c $(RPM_CHANNEL) $(PYPIOPTIONS) $(DEPS)
 
