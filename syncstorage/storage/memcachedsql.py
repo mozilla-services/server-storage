@@ -77,6 +77,7 @@ class MemcachedSQLStorage(SQLStorage):
     def __init__(self, sqluri, standard_collections=False,
                  use_quota=False, quota_size=0, pool_size=100,
                  pool_recycle=3600, cache_servers=None,
+                 cache_pool_size=None,
                  create_tables=False, shard=False, shardsize=100,
                  memcached_json=False, **kw):
         self.sqlstorage = super(MemcachedSQLStorage, self)
@@ -88,10 +89,11 @@ class MemcachedSQLStorage(SQLStorage):
             cache_servers = [cache_servers]
         elif cache_servers is None:
             cache_servers = ['127.0.0.1:11211']
-        extra_kw = {}
+        cache_kw = {}
+        cache_kw["pool_size"] = cache_pool_size
         if memcached_json:
-            extra_kw['serializer'] = _JSONDumper()
-        self.cache = CacheManager(cache_servers, **extra_kw)
+            cache_kw['serializer'] = _JSONDumper()
+        self.cache = CacheManager(cache_servers, **cache_kw)
 
     @classmethod
     def get_name(self):
