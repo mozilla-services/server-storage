@@ -782,14 +782,14 @@ class TestStorage(support.TestWsgiApp):
         config = dict(self.config)
         config['storage.check_blacklisted_nodes'] = True
         from syncstorage import wsgiapp
-        old_client = wsgiapp.Client
-        wsgiapp.Client = None
+        old_client = wsgiapp.MemcachedClient
+        wsgiapp.MemcachedClient = None
         # make sure the app cannot be initialized if it's asked
         # to check for blacklisted node and memcached is not present
         try:
             self.assertRaises(ValueError, support.make_app, config)
         finally:
-            wsgiapp.Client = old_client
+            wsgiapp.MemcachedClient = old_client
 
     def test_metrics(self):
         # make sure we support any metrics marker on info/collections

@@ -6,20 +6,21 @@ PasteScript
 Mako
 MarkupSafe
 Beaker
-python-memcached
 simplejson
 Routes
 SQLAlchemy
 MySQL-python
 WSGIProxy
 recaptcha-client
-pylibmc
 pymysql_sa
 gevent
 greenlet
 PyMySQL
 repoze.lru
 repoze.who
+# The umemcache sdist doesn't play nice with pypi2rpm.
+# We build from a customized branch in the Makefile.
+# umemcache
 zope.deprecation
 zope.interface
 metlog-py

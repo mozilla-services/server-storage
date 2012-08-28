@@ -6,20 +6,21 @@ PasteScript == 1.7.5
 Mako == 0.7
 MarkupSafe == 0.15
 Beaker == 1.6.3
-python-memcached == 1.48
 simplejson == 2.5.2
 Routes == 1.13
 SQLAlchemy == 0.6.6
 MySQL-python == 1.2.3
 WSGIProxy == 0.2.2
 recaptcha-client == 1.0.6
-pylibmc == 1.2.3
 pymysql_sa == 1.0
 gevent == 0.13.7
 greenlet == 0.4
 PyMySQL == 0.5
 repoze.lru == 0.5
 repoze.who == 2.0
+# The umemcache sdist doesn't play nice with pypi2rpm.
+# We build from a customized branch in the Makefile.
+# umemcache == 1.4
 zope.deprecation == 3.5.1
 zope.interface == 3.8
 metlog-py == 0.9.4

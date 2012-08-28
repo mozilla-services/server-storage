@@ -44,9 +44,9 @@ from syncstorage.controller import StorageController
 from syncstorage.storage import get_storage
 
 try:
-    from memcache import Client
+    from syncstorage.mcclient import MemcachedClient
 except ImportError:
-    Client = None       # NOQA
+    MemcachedClient = None       # NOQA
 
 _EXTRAS = {'auth': True}
 
@@ -120,10 +120,10 @@ class StorageServerApp(SyncServerApp):
 
         self.check_blacklist = \
                 self.config.get('storage.check_blacklisted_nodes', False)
-        if self.check_blacklist and Client is not None:
+        if self.check_blacklist and MemcachedClient is not None:
             servers = self.config.get('storage.cache_servers',
                                       '127.0.0.1:11211')
-            self.cache = Client(servers.split(','))
+            self.cache = MemcachedClient(servers.split(','))
         else:
             if self.check_blacklist:
                 raise ValueError('The "check_blacklisted_node" option '
