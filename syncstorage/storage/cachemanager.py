@@ -41,6 +41,7 @@ Memcached + SQL backend
 - The meta/global wbo is stored in "user_id"
 - The info/collections timestamp mapping is stored in "user_id:stamps"
 """
+import thread
 import threading
 
 from pylibmc import Client, NotFound, ThreadMappedPool
