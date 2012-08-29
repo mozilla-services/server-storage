@@ -55,7 +55,10 @@ build:
 	$(INSTALL) coverage
 	$(INSTALL) WebTest
 	$(BUILDAPP) -c $(CHANNEL) $(PYPIOPTIONS) $(DEPS)
-	$(INSTALL) umemcache==1.4
+	# NOTE: we don't install pyzmq and related dependencies here.
+	# They're not needed by default and they require extra system-level
+	# libraries to build.  If you want them, run `make build_rpms` and
+	# it will install them into the virtualenv.
 
 
 update:
@@ -71,12 +74,6 @@ build_rpms:
 	rm -rf rpms
 	mkdir -p ${BUILD_TMP}
 	$(BUILDRPMS) -c $(RPM_CHANNEL) $(PYPIOPTIONS) $(DEPS)
-	# The umemcached release tarball doens't play well with pypi2rpm.
-	# Building from a checkout of the tag seems to fix it.
-	wget -O ${BUILD_TMP}/umemcached.tar.gz https://github.com/esnme/ultramemcache/tarball/b870c66c0898583ab76252e985fd4230d7059947
-	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms ${BUILD_TMP}/umemcached.tar.gz
-	rm -f ${BUILD_TMP}/umemcached.tar.gz
-
 
 mock: build build_rpms
 	mock init

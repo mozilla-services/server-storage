@@ -42,14 +42,14 @@ Memcached + SQL backend
 - The info/collections timestamp mapping is stored in "user_id:stamps"
 """
 import threading
-import cPickle
+
+import memcache
 
 from metlog.holder import CLIENT_HOLDER
 
 from services.util import BackendError
 
 from syncstorage.storage.sql import _KB
-from syncstorage.mcclient import MemcachedClient
 
 USER_KEYS = ('size', 'size:ts', 'meta:global', 'tabs', 'stamps')
 
@@ -59,10 +59,11 @@ def _key(*args):
 
 
 class CacheManager(object):
-    """ Helpers on the top of MemcachedClient class.
-    """
-    def __init__(self, *args, **kw):
-        self._client = PicklingMemcachedClient(*args, **kw)
+    """ Helpers on the top of python-memcached."""
+    def __init__(self, *args, **kwds):
+        # The Client class is transparently thread-local so we
+        # don't need to use a pool here.
+        self._client = memcache.Client(*args, **kwds)
         # using a locker to avoid race conditions
         # when several clients for the same user
         # get/set the cached data
@@ -72,24 +73,35 @@ class CacheManager(object):
     def logger(self):
         return CLIENT_HOLDER.default_client
 
+    def flush_all(self):
+        self._client.flush_all()
+
     def get(self, key):
         with self.logger.timer("syncstorage.storage.cachemanager.get"):
+            # This will return None is the key is missing, but also
+            # if the server is down.  No way to detect errors.
             return self._client.get(key)
 
     def delete(self, key):
         with self.logger.timer("syncstorage.storage.cachemanager.delete"):
-            return self._client.delete(key)
+            if not self._client.delete(key):
+                raise BackendError("delete() failed")
+            return True
 
     def incr(self, key, size=1):
         size = int(size)
         with self.logger.timer("syncstorage.storage.cachemanager.incr"):
             res = self._client.incr(key, size)
             if res is None:
-                res = self._client.set(key, size)
+                if not self._client.set(key, size):
+                    raise BackendError("set() failed")
+                res = size
+        return res
 
     def set(self, key, value):
         with self.logger.timer("syncstorage.storage.cachemanager.set"):
-            self._client.set(key, value)
+            if not self._client.set(key, value):
+                raise BackendError("set() failed")
 
     def get_set(self, key, func):
         res = self.get(key)
@@ -248,73 +260,3 @@ class CacheManager(object):
         except BackendError:
             total = None
         return total
-
-
-# These are the flags are used by pylibmc to determine how the
-# stored data has been serialized.
-MC_FLAG_NONE = 0
-MC_FLAG_PICKLE = (1 << 0)
-MC_FLAG_INTEGER = (1 << 1)
-MC_FLAG_LONG = (1 << 2)
-MC_FLAG_ZLIB = (1 << 3)
-MC_FLAG_BOOL = (1 << 4)
-
-
-class DefaultSerializer(object):
-    """Default serializer object for PicklingMemcachedClient.
-
-    Instances of this class provide dumps() and loads() method that use
-    cPickle with protocol set to -1.
-    """
-
-    def dumps(self, value):
-        return cPickle.dumps(value, -1)
-
-    def loads(self, data):
-        return cPickle.loads(data)
-
-
-class PicklingMemcachedClient(MemcachedClient):
-    """Memcached client that is compatible with pylibmc's pickling scheme.
-
-    The pylibmc and python-memcached modules use a customized serialization
-    scheme that stores strings and integers as simple values, but complex
-    python types as pickled data.  The memcached "flags" value is used to
-    differenciate between them.
-
-    This subclasses adds matching functionality to our umemcache client.
-    """
-
-    def __init__(self, cache_servers, serializer=None, **kwds):
-        if serializer is None:
-            serializer = DefaultSerializer()
-        self._serializer = serializer
-        super(PicklingMemcachedClient, self).__init__(cache_servers, **kwds)
-
-    def dumps(self, value):
-        if isinstance(value, str):
-            return value, MC_FLAG_NONE
-        if isinstance(value, bool):
-            return "1" if value else "0", MC_FLAG_BOOL
-        if isinstance(value, int):
-            return str(value), MC_FLAG_INTEGER
-        if isinstance(value, long):
-            return str(value), MC_FLAG_LONG
-        return self._serializer.dumps(value), MC_FLAG_PICKLE
-
-    def loads(self, data, flags):
-        if flags & MC_FLAG_ZLIB:
-            # We could support zlib-compressed data if necessary, but
-            # I don't think it's used anywhere in our setup.
-            raise BackendError("zlib-compressed data is not supported")
-        if flags & MC_FLAG_NONE:
-            return data
-        if flags & MC_FLAG_PICKLE:
-            return self._serializer.loads(data)
-        if flags & MC_FLAG_INTEGER:
-            return int(data)
-        if flags & MC_FLAG_LONG:
-            return long(data)
-        if flags & MC_FLAG_BOOL:
-            return bool(int(data))
-        raise BackendError("Unknown serialization flag %d" % (flags,))

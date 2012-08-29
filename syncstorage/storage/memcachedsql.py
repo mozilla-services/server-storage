@@ -60,14 +60,21 @@ _COLLECTION_LIST = select([wbo.c.collection, func.max(wbo.c.modified),
             wbo.c.username == bindparam('user_id')).group_by(wbo.c.collection)
 
 
+# XXX suboptimal: creates an object on every dump/load call
+# but that's how python-memcached works - using a class
+# instead of an object would not be thread-safe.
+#
+# Need to ask Sean to improve this
 class _JSONDumper(object):
-    """Dumps and loads json with use_decimal set to true."""
+    """Dumps and loads json in a file-like object"""
+    def __init__(self, file, protocol=0):
+        self.file = file
 
-    def dumps(self, val):
-        return json.dumps(val, use_decimal=True)
+    def dump(self, val):
+        self.file.write(json.dumps(val, use_decimal=True))
 
-    def loads(self):
-        return json.loads(self.file.read(), use_decimal=True)
+    def load(self):
+        return json.loads(self.file.read())
 
 
 class MemcachedSQLStorage(SQLStorage):
@@ -90,7 +97,8 @@ class MemcachedSQLStorage(SQLStorage):
             cache_servers = ['127.0.0.1:11211']
         extra_kw = {}
         if memcached_json:
-            extra_kw['serializer'] = _JSONDumper()
+            extra_kw['pickler'] = _JSONDumper
+            extra_kw['unpickler'] = _JSONDumper
         self.cache = CacheManager(cache_servers, **extra_kw)
 
     @classmethod

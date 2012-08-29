@@ -40,7 +40,7 @@ from tempfile import mkstemp
 import os
 
 try:
-    import umemcache  # NOQA
+    import memcache  # NOQA
 except ImportError:
     MEMCACHED = False
 else:
@@ -83,24 +83,13 @@ if MEMCACHED:
 
             self.storage = SyncStorage.get(self.fn, **kw)
 
-            # record any keys that we create, for deletion in tearDown().
-            self.cache_keys_created = set()
-            orig_set = self.storage.cache.set
-
-            def new_set(key, *args, **kwds):
-                res = orig_set(key, *args, **kwds)
-                self.cache_keys_created.add(key)
-                return res
-
-            self.storage.cache.set = new_set
-
             # make sure we have the standard collections in place
+
             for name in ('client', 'crypto', 'forms', 'history'):
                 self.storage.set_collection(_UID, name)
 
         def tearDown(self):
-            for key in self.cache_keys_created:
-                self.storage.cache.delete(key)
+            self.storage.cache.flush_all()
             self.storage.delete_user(_UID)
             if os.path.exists(self.dbfile):
                 os.remove(self.dbfile)
