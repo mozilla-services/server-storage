@@ -40,7 +40,7 @@ from tempfile import mkstemp
 import os
 
 try:
-    import memcache  # NOQA
+    import pylibmc  # NOQA
 except ImportError:
     MEMCACHED = False
 else:
