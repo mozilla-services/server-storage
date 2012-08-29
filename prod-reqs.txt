@@ -22,5 +22,5 @@ repoze.lru == 0.5
 repoze.who == 2.0
 zope.deprecation == 3.5.1
 zope.interface == 3.8
-metlog-py == 0.9.4
+metlog-py == 0.9.5
 nose==1.1.2
