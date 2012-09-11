@@ -54,17 +54,15 @@ class TestMetlog(unittest.TestCase):
         request = make_request(path, environ)
         self.app(request)
         sender = self.app.logger.sender
-        self.assertEqual(len(sender.msgs), 4)
-        msg0 = json.loads(sender.msgs[0])
+        msgs = list(sender.msgs)[-3:]
+        msg0 = json.loads(msgs[0])
         self.assertEqual(msg0.get('type'), 'timer')
-        msg1 = json.loads(sender.msgs[1])
-        self.assertEqual(msg1.get('type'), 'timer')
-        msg2 = json.loads(sender.msgs[2])
-        self.assertEqual(msg2.get('type'), 'counter')
-        msg3 = json.loads(sender.msgs[3])
-        self.assertEqual(msg3.get('type'), 'services')
-        self.assertEqual(msg3['fields']['userid'], self.username)
-        self.assertTrue('req_time' in msg3['fields'])
+        msg1 = json.loads(msgs[1])
+        self.assertEqual(msg1.get('type'), 'counter')
+        msg2 = json.loads(msgs[2])
+        self.assertEqual(msg2.get('type'), 'services')
+        self.assertEqual(msg2['fields']['userid'], self.username)
+        self.assertTrue('req_time' in msg2['fields'])
 
     def test_addl_services_data(self):
         path = '/1.1/%s/info/collections' % self.username
@@ -88,8 +86,8 @@ class TestMetlog(unittest.TestCase):
         wrapped_method._fn._fn._fn = services_data_wrapper(orig_inner)
         self.app(request)
         sender = self.app.logger.sender
-        self.assertEqual(len(sender.msgs), 4)
-        msg2 = json.loads(sender.msgs[3])
+        msgs = list(sender.msgs)[-3:]
+        msg2 = json.loads(msgs[2])
         self.assertEqual(msg2.get('type'), 'services')
         expected = data.copy()
         expected['userid'] = self.username

@@ -33,6 +33,7 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
+import json
 import unittest
 import os
 import time
@@ -40,7 +41,9 @@ import time
 from syncstorage.tests.support import initenv
 from syncstorage.storage.sqlmappers import get_wbo_table_name
 from syncstorage.storage import SyncStorage
-from syncstorage.storage.sql import SQLStorage
+from syncstorage.storage.sql import (SQLStorage, sql_timer_name,
+                                     timed_safe_execute)
+from syncstorage.wsgiapp import make_app
 SyncStorage.register(SQLStorage)
 
 from services.auth import ServicesAuth
@@ -55,6 +58,8 @@ _PLD = '*' * 500
 class TestSQLStorage(unittest.TestCase):
 
     def setUp(self):
+        config_file = os.path.join(os.path.dirname(__file__), "sync.conf")
+        self.app = make_app({"configuration": "file:" + config_file}).app
         self.appdir, self.config, self.storage, self.auth = initenv()
         # we don't support other storages for this test
         assert self.storage.sqluri.split(':/')[0] in ('mysql', 'sqlite',
@@ -67,6 +72,8 @@ class TestSQLStorage(unittest.TestCase):
             self.storage.set_collection(_UID, name)
 
         self._cfiles = []
+        # delete the decorator's cached metlog client
+        timed_safe_execute._client = None
 
     def tearDown(self):
         self._del_db()
@@ -304,6 +311,15 @@ class TestSQLStorage(unittest.TestCase):
 
         appdir, config, storage, auth = initenv(conf)
         self.assertEqual(storage._engine.pool.__class__.__name__, 'NullPool')
+
+    def test_query_timing(self):
+        query = 'select * from collections'
+        res = timed_safe_execute(self.storage._engine, query)
+        self.assertEqual(len(list(res)), 10)
+        sender = self.app.logger.sender
+        msg = json.loads(list(sender.msgs)[-1])
+        self.assertEqual(msg.get('type'), 'timer')
+        self.assertEqual(msg.get('fields').get('name'), sql_timer_name)
 
 
 def test_suite():

@@ -47,6 +47,7 @@ import threading
 from pylibmc import Client, NotFound, ThreadMappedPool
 from pylibmc import Error as MemcachedError
 
+from metlog.decorators.stats import timeit as metlog_timeit
 from metlog.holder import CLIENT_HOLDER
 
 from services.util import BackendError
@@ -75,7 +76,11 @@ class CacheManager(object):
 
     @property
     def logger(self):
-        return CLIENT_HOLDER.default_client
+        # Store the result on the object itself. This will prevent the
+        # @property descriptor from firing on every call.
+        client = CLIENT_HOLDER.default_client
+        self.__dict__['logger'] = client
+        return client
 
     def _cleanup_pool(self, response):
         self.pool.pop(thread.get_ident(), None)
@@ -84,43 +89,43 @@ class CacheManager(object):
         with self.pool.reserve() as mc:
             mc.flush_all()
 
+    @metlog_timeit
     def get(self, key):
         with self.pool.reserve() as mc:
             try:
-                with self.logger.timer("syncstorage.storage.cachemanager.get"):
-                    return mc.get(key)
+                return mc.get(key)
             except MemcachedError, err:
                 # memcache seems down
                 raise BackendError(str(err))
 
+    @metlog_timeit
     def delete(self, key):
         with self.pool.reserve() as mc:
             try:
-                with self.logger.timer("syncstorage.storage.cachemanager.delete"):
-                    return mc.delete(key)
+                return mc.delete(key)
             except NotFound:
                 return False
             except MemcachedError, err:
                 # memcache seems down
                 raise BackendError(str(err))
 
+    @metlog_timeit
     def incr(self, key, size=1):
         size = int(size)
         with self.pool.reserve() as mc:
             try:
-                with self.logger.timer("syncstorage.storage.cachemanager.incr"):
-                    return mc.incr(key, size)
+                return mc.incr(key, size)
             except NotFound:
                 return mc.set(key, size)
             except MemcachedError, err:
                 raise BackendError(str(err))
 
+    @metlog_timeit
     def set(self, key, value):
         with self.pool.reserve() as mc:
             try:
-                with self.logger.timer("syncstorage.storage.cachemanager.set"):
-                    if not mc.set(key, value):
-                        raise BackendError()
+                if not mc.set(key, value):
+                    raise BackendError()
             except MemcachedError, err:
                 raise BackendError(str(err))
 

@@ -63,6 +63,7 @@ from sqlalchemy.sql.expression import _generative, Delete, _clone, ClauseList
 from sqlalchemy import util
 from sqlalchemy.sql.compiler import SQLCompiler
 
+from metlog.decorators.stats import timeit as metlog_timeit
 from metlog.holder import CLIENT_HOLDER
 
 from syncstorage.storage import StorageConflictError
@@ -76,6 +77,9 @@ from services.util import (time2bigint, bigint2time, round_time,
                            safe_execute, create_engine)
 from syncstorage.wbo import WBO
 
+
+sql_timer_name = 'syncstorage.storage.sql.timed_safe_execute'
+timed_safe_execute = metlog_timeit(sql_timer_name)(safe_execute)
 
 _KB = float(1024)
 
@@ -274,31 +278,28 @@ class SQLStorage(object):
 
     def _do_query(self, *args, **kwds):
         """Execute a database query, returning the rowcount."""
-        with self.logger.timer("syncstorage.storage.sql.safe_execute"):
-            res = safe_execute(self._engine, *args, **kwds)
-            try:
-                return res.rowcount
-            finally:
-                res.close()
+        res = timed_safe_execute(self._engine, *args, **kwds)
+        try:
+            return res.rowcount
+        finally:
+            res.close()
 
     def _do_query_fetchone(self, *args, **kwds):
         """Execute a database query, returning the first result."""
-        with self.logger.timer("syncstorage.storage.sql.safe_execute"):
-            res = safe_execute(self._engine, *args, **kwds)
-            try:
-                return res.fetchone()
-            finally:
-                res.close()
+        res = timed_safe_execute(self._engine, *args, **kwds)
+        try:
+            return res.fetchone()
+        finally:
+            res.close()
 
     def _do_query_fetchall(self, *args, **kwds):
         """Execute a database query, returning iterator over the results."""
-        with self.logger.timer("syncstorage.storage.sql.safe_execute"):
-            res = safe_execute(self._engine, *args, **kwds)
-            try:
-                for row in res:
-                    yield row
-            finally:
-                res.close()
+        res = timed_safe_execute(self._engine, *args, **kwds)
+        try:
+            for row in res:
+                yield row
+        finally:
+            res.close()
 
     #
     # Users APIs
