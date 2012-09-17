@@ -69,6 +69,10 @@ post_count_distribution = [67, 18, 9, 4, 2]
 # 99% will do 0 DELETEs, 1% will do 1 DELETE, etc...
 delete_count_distribution = [99, 1, 0, 0, 0]
 
+# The probability that we'll try to do a full DELETE of all data.
+# Expressed as a float between 0 and 1.
+deleteall_probability = 1 / 100.
+
 
 class StressTest(FunkLoadTestCase):
 
@@ -149,13 +153,21 @@ class StressTest(FunkLoadTestCase):
             self.assertEquals(len(result["success"]), items_per_batch)
             self.assertEquals(len(result["failed"]), 0)
 
-        # DELETE requests to individual collections.
+        # DELETE requests.
+        # We might choose to delete some individual collections, or to do
+        # a full reset and delete all the data.  Never both in the same run.
         num_requests = self._pick_weighted_count(delete_count_distribution)
-        cols = random.sample(collections, num_requests)
         self.setOkCodes([200])
-        for x in range(num_requests):
-            url = node + "/%s/%s/storage/%s" % (VERSION, username, cols[x])
-            self.delete(url)
+        if num_requests:
+            cols = random.sample(collections, num_requests)
+            for x in range(num_requests):
+                url = node + "/%s/%s/storage/%s" % (VERSION, username, cols[x])
+                self.delete(url)
+        else:
+            if random.random() <= deleteall_probability:
+                url = node + "/%s/%s/storage" % (VERSION, username)
+                self.setHeader("X-Confirm-Delete", "true")
+                self.delete(url)
 
     def _pick_node(self):
         node = None
