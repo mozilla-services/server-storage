@@ -10,7 +10,6 @@ python-memcached
 simplejson
 Routes
 SQLAlchemy
-MySQL-python
 WSGIProxy
 recaptcha-client
 pylibmc

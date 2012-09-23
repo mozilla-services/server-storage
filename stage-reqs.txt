@@ -10,7 +10,6 @@ python-memcached == 1.48
 simplejson == 2.5.2
 Routes == 1.13
 SQLAlchemy == 0.6.6
-MySQL-python == 1.2.3
 WSGIProxy == 0.2.2
 recaptcha-client == 1.0.6
 pylibmc == 1.2.3
