@@ -74,6 +74,12 @@ build_rpms:
 	rm -rf rpms
 	mkdir -p ${BUILD_TMP}
 	$(BUILDRPMS) -c $(RPM_CHANNEL) $(PYPIOPTIONS) $(DEPS)
+	# Meliae doesn't play nicely with pypi2rpm.
+	$(INSTALL) cython
+	wget -O ${BUILD_TMP}/meliae-0.4.0.tar.gz https://launchpad.net/meliae/trunk/0.4/+download/meliae-0.4.0.tar.gz
+	cd ${BUILD_TMP}; tar -xzvf meliae-0.4.0.tar.gz
+	cd ${BUILD_TMP}/meliae-0.4.0; python setup.py  --command-packages=pypi2rpm.command bdist_rpm2 --binary-only --name=python26-meliae --dist-dir=$(CURDIR)/rpms
+	rm -rf ${BUILD_TMP}
 
 mock: build build_rpms
 	mock init
