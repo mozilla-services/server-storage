@@ -1,3 +1,55 @@
+1.14 - 2012-10-11
+=================
+
+Impacts:
+
+- Ops
+- QA
+
+Dependencies:
+
+- python-services: 2.11
+
+Relevant Changes: 
+
+This release is mainly designed to get the memory-usage-debugging facilities
+from server-core version 2.11.  It also updates the dependencies to latest
+released versions, in particular the version of SQLAlchemy goes from 0.6.6
+to 0.7.9.
+
+Add metlog-cef as a dependency
+Bug 799874 - build meliae rpms for deployment
+Bug 693896 - use DELETE /storage in the loadtest
+Bug 787287 - Switch to using decorators for sql and memcache timers
+Bug 749997 - log detailed error when we encounter corrupt db data
+
+
+1.13 - 2012-08-29
+=================
+
+Impacts:
+
+- Ops
+- QA
+
+Dependencies:
+
+- python-services: 2.10
+
+Relevant Changes: 
+
+Bug 782002 - Make funkload tests be more like grinder tests
+Bug 781451 - Log greenlets that block the event loop for too long
+Bug 781396 - Don't silence ImportErrors from the memcache backend
+Bug 773073 - don't send stringified exceptions to the client
+Bug 774848 - Remove version requirement on sqlalchemy <= 0.6.99
+Bug 772716 - log user id and request processing time for each request
+Bug 764065 - Port sync1.1 loadtest to funkload
+Bug 764719 - server-core config files should support %(here)s syntax
+Bug 781382 - Add timers around memcache and database accesses
+
+
+
 1.12 - 2012-05-30
 =================
 
