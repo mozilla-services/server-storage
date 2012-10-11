@@ -316,7 +316,7 @@ class TestSQLStorage(unittest.TestCase):
         query = 'select * from collections'
         res = timed_safe_execute(self.storage._engine, query)
         self.assertEqual(len(list(res)), 10)
-        sender = self.app.logger.sender
+        sender = timed_safe_execute._client.sender
         msg = json.loads(list(sender.msgs)[-1])
         self.assertEqual(msg.get('type'), 'timer')
         self.assertEqual(msg.get('fields').get('name'), sql_timer_name)
