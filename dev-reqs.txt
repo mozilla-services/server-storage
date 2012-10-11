@@ -24,3 +24,4 @@ zope.interface
 metlog-py >= 0.9.6
 metlog-cef
 nose
+docopt
