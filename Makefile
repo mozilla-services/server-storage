@@ -55,10 +55,6 @@ build:
 	$(INSTALL) coverage
 	$(INSTALL) WebTest
 	$(BUILDAPP) -c $(CHANNEL) $(PYPIOPTIONS) $(DEPS)
-	# NOTE: we don't install pyzmq and related dependencies here.
-	# They're not needed by default and they require extra system-level
-	# libraries to build.  If you want them, run `make build_rpms` and
-	# it will install them into the virtualenv.
 
 
 update:
@@ -75,9 +71,13 @@ build_rpms:
 	mkdir -p ${BUILD_TMP}
 	$(BUILDRPMS) -c $(RPM_CHANNEL) $(PYPIOPTIONS) $(DEPS)
 	# Meliae doesn't play nicely with pypi2rpm.
+	# It also eneds to be patched to work with ctypes.
+	# Ergo, we have to build it by hand.
 	$(INSTALL) cython
 	wget -O ${BUILD_TMP}/meliae-0.4.0.tar.gz https://launchpad.net/meliae/trunk/0.4/+download/meliae-0.4.0.tar.gz
 	cd ${BUILD_TMP}; tar -xzvf meliae-0.4.0.tar.gz
+	patch ${BUILD_TMP}/meliae-0.4.0/meliae/_scanner_core.c ./meliae-scanner-assertion-fix.patch
+	$(INSTALL) ${BUILD_TMP}/meliae-0.4.0
 	cd ${BUILD_TMP}/meliae-0.4.0; python setup.py  --command-packages=pypi2rpm.command bdist_rpm2 --binary-only --name=python26-meliae --dist-dir=$(CURDIR)/rpms
 	rm -rf ${BUILD_TMP}
 

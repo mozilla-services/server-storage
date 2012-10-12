@@ -1,0 +1,123 @@
+--- meliae-0.4.0/meliae/_scanner_core.c	2011-07-08 05:48:08.000000000 -0700
++++ meliae-0.4.0.patched/meliae/_scanner_core.c	2012-10-11 19:22:27.284706954 -0700
+@@ -52,6 +52,72 @@
+     PyObject *nodump;
+ };
+ 
++
++//  There are certain kinds of object that can cause assertion failures
++//  if we try to traverse them.  The PyTypeObject.tp_traverse fuction
++//  will fail if the type is not a HEAPTYPE, so we need to detect and avoid
++//  calling it in such situations.
++//
++//    See: https://bugs.launchpad.net/bugs/586122
++//         https://bugs.launchpad.net/meliae/+bug/893461
++//
++static PyTypeObject *StructType_Type = NULL;
++
++
++static int _can_traverse(PyObject *c_obj)
++{
++    if (Py_TYPE(c_obj)->tp_traverse == NULL) {
++        return 0;
++    }
++    if (!PyType_HasFeature((PyTypeObject*)c_obj, Py_TPFLAGS_HEAPTYPE)) {
++        if (Py_TYPE(c_obj)->tp_traverse == PyType_Type.tp_traverse) {
++            return 0;
++        }
++        if (StructType_Type != NULL
++            && Py_TYPE(c_obj)->tp_traverse == StructType_Type->tp_traverse) {
++            return 0;
++        }
++    }
++    return 1;
++}
++
++
++// Prepare for traversal, by loading and caching any type references
++// that will be needed along the way.
++//
++void _prepare_for_traversal(void)
++{
++    PyObject* sys_modules = NULL;
++    PyObject* mod_ctypes = NULL;
++    PyObject* typ_struct = NULL;
++
++    if(StructType_Type != NULL) {
++        return;
++    }
++
++    sys_modules = PyImport_GetModuleDict();  // borrowed reference
++
++    if (!PyMapping_HasKeyString(sys_modules, "_ctypes")) {
++        return;
++    }
++    mod_ctypes = PyMapping_GetItemString(sys_modules, "_ctypes");
++    if(mod_ctypes == NULL) {
++        return;
++    }
++
++    typ_struct = PyObject_GetAttrString(mod_ctypes, "Structure");
++    if(typ_struct == NULL) {
++        Py_DECREF(mod_ctypes);
++        return;
++    }
++
++    StructType_Type = Py_TYPE(typ_struct);
++    Py_INCREF(StructType_Type);
++    Py_DECREF(typ_struct);
++    Py_DECREF(mod_ctypes);
++}
++
++
+ void _dump_object_to_ref_info(struct ref_info *info, PyObject *c_obj,
+                               int recurse);
+ #ifdef __GNUC__
+@@ -444,6 +510,8 @@
+ {
+     struct ref_info info;
+ 
++    _prepare_for_traversal();
++
+     info.write = write;
+     info.data = callee_data;
+     info.first = 1;
+@@ -545,20 +613,7 @@
+         }
+     }
+     _write_static_to_info(info, ", \"refs\": [");
+-    do_traverse = 1;
+-    if (Py_TYPE(c_obj)->tp_traverse == NULL
+-        || (Py_TYPE(c_obj)->tp_traverse == PyType_Type.tp_traverse
+-            && !PyType_HasFeature((PyTypeObject*)c_obj, Py_TPFLAGS_HEAPTYPE)))
+-    {
+-        /* Obviously we don't traverse if there is no traverse function. But
+-         * also, if this is a 'Type' (class definition), then
+-         * PyTypeObject.tp_traverse has an assertion about whether this type is
+-         * a HEAPTYPE. In debug builds, this can trip and cause failures, even
+-         * though it doesn't seem to hurt anything.
+-         *  See: https://bugs.launchpad.net/bugs/586122
+-         */
+-        do_traverse = 0;
+-    }
++    do_traverse = _can_traverse(c_obj);
+     if (do_traverse) {
+         info->first = 1;
+         Py_TYPE(c_obj)->tp_traverse(c_obj, _dump_reference, info);
+@@ -597,13 +652,13 @@
+ {
+     PyObject *lst;
+ 
++    _prepare_for_traversal();
++
+     lst = PyList_New(0);
+     if (lst == NULL) {
+         return NULL;
+     }
+-    if (Py_TYPE(c_obj)->tp_traverse != NULL
+-        && (Py_TYPE(c_obj)->tp_traverse != PyType_Type.tp_traverse
+-            || PyType_HasFeature((PyTypeObject *)c_obj, Py_TPFLAGS_HEAPTYPE)))
++    if (_can_traverse(c_obj))
+     {
+         Py_TYPE(c_obj)->tp_traverse(c_obj, _append_object, lst);
+     }
