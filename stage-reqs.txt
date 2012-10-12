@@ -24,4 +24,4 @@ zope.interface == 4.0.1
 metlog-py == 0.9.8
 metlog-cef == 0.1
 nose==1.2.1
-docopt==0.5.0
+docopt==0.5
