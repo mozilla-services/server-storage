@@ -494,7 +494,7 @@ class SQLStorage(object):
         return data
 
     def _purge_cache(self, user_id):
-        self._temp_cache[user_id].clear()
+        self._temp_cache.pop(user_id, None)
 
     def _collid2name(self, user_id, collection_id):
         if (self.standard_collections and
