@@ -1,3 +1,25 @@
+1.15 - 2012-10-19
+=================
+
+Impacts:
+
+- Ops
+- QA
+
+Dependencies:
+
+- python-services: 2.12
+
+Relevant Changes: 
+
+This release fixes a memory usage issue in the SQLStorage backend.  It also
+fixes incorrectly-formatted CEF logging data by updating the cef library 
+dependency to version 0.5.
+
+Bug 790829 - use new version of cef library
+Bug 802486 - fix memory leak in SQLStorage._temp_cache
+
+
 1.14 - 2012-10-11
 =================
 
