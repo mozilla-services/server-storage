@@ -12,11 +12,8 @@ Dependencies:
 
 Relevant Changes: 
 
-This release fixes a memory usage issue in the SQLStorage backend.  It also
-fixes incorrectly-formatted CEF logging data by updating the cef library 
-dependency to version 0.5.
+This release fixes a memory usage issue in the SQLStorage backend.
 
-Bug 790829 - use new version of cef library
 Bug 802486 - fix memory leak in SQLStorage._temp_cache
 
 
