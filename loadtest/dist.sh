@@ -1,6 +1,7 @@
 #!/bin/sh
 
-workers="client4.scl2.svc.mozilla.com client5.scl2.svc.mozilla.com client6.scl2.svc.mozilla.com client7.scl2.svc.mozilla.com client8.scl2.svc.mozilla.com client9.scl2.svc.mozilla.com"
+workers="client11.scl2.svc.mozilla.com client12.scl2.svc.mozilla.com client13.scl2.svc.mozilla.com client15.scl2.svc.mozilla.com client16.scl2.svc.mozilla.com"
+
 dest_dir="$HOME/syncstorage-loadtest"
 source_dir=$(dirname $0)
 
