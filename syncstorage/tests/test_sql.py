@@ -278,7 +278,7 @@ class TestSQLStorage(unittest.TestCase):
         storage.set_user(_UID, email='tarek@ziade.org')
 
     def test_shard(self):
-        self._add_cleanup(os.path.join('/tmp', 'tests2.db'))
+        self._add_cleanup(os.path.join('/tmp', 'test-sync-storage-2.db'))
 
         # make shure we do shard
         testsdir = os.path.dirname(__file__)

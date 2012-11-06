@@ -50,8 +50,8 @@ class TestWSGIApp(unittest.TestCase):
         class request:
             host = "localhost"
         self.assertEquals(self.app.get_storage(request).sqluri,
-                          "sqlite:////tmp/tests.db")
-        os.unlink("/tmp/tests.db")
+                          "sqlite:////tmp/test-sync-storage.db")
+        os.unlink("/tmp/test-sync-storage.db")
         request.host = "some-test-host"
         self.assertEquals(self.app.get_storage(request).sqluri,
                           "sqlite:////tmp/some-test-host.db")
