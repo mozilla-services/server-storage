@@ -54,6 +54,9 @@ from nose import SkipTest
 from syncstorage.storage import SyncStorage
 from syncstorage.controller import _ONE_MEG
 
+# This establishes the MOZSVC_UUID environment variable.
+import syncstorage.tests.support  # NOQA
+
 from services.util import BackendError, round_time
 from services.config import Config
 from services.pluginreg import load_and_configure

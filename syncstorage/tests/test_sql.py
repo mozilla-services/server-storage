@@ -38,7 +38,7 @@ import unittest
 import os
 import time
 
-from syncstorage.tests.support import initenv
+from syncstorage.tests.support import initenv, cleanupenv
 from syncstorage.storage.sqlmappers import get_wbo_table_name
 from syncstorage.storage import SyncStorage
 from syncstorage.storage.sql import (SQLStorage, sql_timer_name,
@@ -58,39 +58,37 @@ _PLD = '*' * 500
 class TestSQLStorage(unittest.TestCase):
 
     def setUp(self):
+        self.appdir, self.config, self.storage, self.auth = initenv()
         config_file = os.path.join(os.path.dirname(__file__), "sync.conf")
         self.app = make_app({"configuration": "file:" + config_file}).app
-        self.appdir, self.config, self.storage, self.auth = initenv()
-        # we don't support other storages for this test
-        assert self.storage.sqluri.split(':/')[0] in ('mysql', 'sqlite',
-                                                      'pymysql')
 
-        self.sqlfile = self.storage.sqluri.split('sqlite:///')[-1]
+        # we don't support other storages for this test
+        self.sql_driver = self.storage.sqluri.split(':/')[0]
+        assert self.sql_driver in ('mysql', 'sqlite', 'pymysql')
+
         # make sure we have the standard collections in place
         for name in ('client', 'crypto', 'forms', 'history', 'key', 'meta',
                      'bookmarks', 'prefs', 'tabs', 'passwords'):
             self.storage.set_collection(_UID, name)
 
-        self._cfiles = []
+        self._cleanup_functions = []
         # delete the decorator's cached metlog client
         timed_safe_execute._client = None
 
     def tearDown(self):
-        self._del_db()
-        for file_ in self._cfiles:
-            if os.path.exists(file_):
-                os.remove(file_)
+        if self.sql_driver != "sqlite":
+            self._truncate_db()
+        for cfunc in self._cleanup_functions:
+            cfunc()
+        cleanupenv()
 
-    def _add_cleanup(self, path):
-        self._cfiles.append(path)
+    def _add_cleanup(self, cfunc, *args, **kwds):
+        self._cleanup_functions.append(lambda: cfunc(*args, **kwds))
 
-    def _del_db(self):
-        if os.path.exists(self.sqlfile):
-            os.remove(self.sqlfile)
-        else:
-            self.storage._engine.execute('truncate users')
-            self.storage._engine.execute('truncate collections')
-            self.storage._engine.execute('truncate wbo')
+    def _truncate_db(self):
+        self.storage._engine.execute('truncate users')
+        self.storage._engine.execute('truncate collections')
+        self.storage._engine.execute('truncate wbo')
 
     def test_user_exists(self):
         self.assertFalse(self.storage.user_exists(_UID))
@@ -252,6 +250,7 @@ class TestSQLStorage(unittest.TestCase):
         # when not provided it is not created
         conf = os.path.join(testsdir, 'tests3.ini')
         appdir, config, storage, auth = initenv(conf)
+        self._add_cleanup(cleanupenv, conf)
 
         # this should fail because the table is absent
         self.assertRaises(BackendError, storage.set_user, _UID,
@@ -260,31 +259,25 @@ class TestSQLStorage(unittest.TestCase):
         # create_table = false
         conf = os.path.join(testsdir, 'tests4.ini')
         appdir, config, storage, auth = initenv(conf)
-        sqlfile = storage.sqluri.split('sqlite:///')[-1]
-        try:
-            # this should fail because the table is absent
-            self.assertRaises(BackendError, storage.set_user, _UID,
-                              email='tarek@ziade.org')
-        finally:
-            # removing the db created
-            if os.path.exists(sqlfile):
-                os.remove(sqlfile)
+        self._add_cleanup(cleanupenv, conf)
+        # this should fail because the table is absent
+        self.assertRaises(BackendError, storage.set_user, _UID,
+                          email='tarek@ziade.org')
 
         # create_table = true
         conf = os.path.join(testsdir, 'tests2.ini')
         appdir, config, storage, auth = initenv(conf)
-
+        self._add_cleanup(cleanupenv, conf)
         # this should work because the table is absent
         storage.set_user(_UID, email='tarek@ziade.org')
 
     def test_shard(self):
-        self._add_cleanup(os.path.join('/tmp', 'test-sync-storage-2.db'))
-
         # make shure we do shard
         testsdir = os.path.dirname(__file__)
         conf = os.path.join(testsdir, 'tests2.ini')
 
         appdir, config, storage, auth = initenv(conf)
+        self._add_cleanup(cleanupenv, conf)
 
         res = storage._engine.execute('select count(*) from wbo1')
         self.assertEqual(res.fetchall()[0][0], 0)
@@ -310,6 +303,7 @@ class TestSQLStorage(unittest.TestCase):
         conf = os.path.join(testsdir, 'tests2.ini')
 
         appdir, config, storage, auth = initenv(conf)
+        self._add_cleanup(cleanupenv, conf)
         self.assertEqual(storage._engine.pool.__class__.__name__, 'NullPool')
 
     def test_query_timing(self):

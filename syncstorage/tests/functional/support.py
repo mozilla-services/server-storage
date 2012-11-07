@@ -43,7 +43,7 @@ import urlparse
 from webtest import TestApp
 import wsgiproxy.app
 
-from syncstorage.tests.support import initenv
+from syncstorage.tests.support import initenv, cleanupenv
 from syncstorage.wsgiapp import make_app
 
 
@@ -66,7 +66,8 @@ class TestWsgiApp(unittest.TestCase):
         # loading the app
         self.appdir, self.config, self.storage, self.auth = initenv()
         # we don't support other storages for this test
-        assert self.storage.sqluri.split(':/')[0] in ('mysql', 'sqlite')
+        self.sql_driver = self.storage.sqluri.split(':/')[0]
+        assert self.sql_driver in ('mysql', 'sqlite', 'pymysql')
         test_remote_url = os.environ.get("TEST_REMOTE")
         if test_remote_url is not None:
             self.distant = True
@@ -90,14 +91,12 @@ class TestWsgiApp(unittest.TestCase):
             if os.path.exists(cef_logs):
                 os.remove(cef_logs)
             # Delete or truncate database we may have touched.
-            for storage in self.app.app.app.storages.itervalues():
-                sqlfile = storage.sqluri.split('sqlite:///')[-1]
-                if os.path.exists(sqlfile):
-                    os.remove(sqlfile)
-                else:
+            if self.sql_driver != "sqlite":
+                for storage in self.app.app.app.storages.itervalues():
                     storage._engine.execute('truncate users')
                     storage._engine.execute('truncate collections')
                     storage._engine.execute('truncate wbo')
+        cleanupenv()
 
     def _setup_user(self):
         self.user_name = 'test_user_%d' % random.randint(1, 100000)

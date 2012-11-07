@@ -39,6 +39,9 @@ import os
 
 from syncstorage.wsgiapp import make_app
 
+# This establishes the MOZSVC_UUID environment variable.
+import syncstorage.tests.support  # NOQA
+
 
 class TestWSGIApp(unittest.TestCase):
 
@@ -46,17 +49,22 @@ class TestWSGIApp(unittest.TestCase):
         config_file = os.path.join(os.path.dirname(__file__), "sync.conf")
         self.app = make_app({"configuration": "file:" + config_file}).app
 
+    def tearDown(self):
+        for storage in self.app.storages.itervalues():
+            sqlfile = storage.sqluri.split('sqlite:///')[-1]
+            if os.path.exists(sqlfile):
+                os.remove(sqlfile)
+
     def test_host_specific_config(self):
         class request:
             host = "localhost"
-        self.assertEquals(self.app.get_storage(request).sqluri,
-                          "sqlite:////tmp/test-sync-storage.db")
-        os.unlink("/tmp/test-sync-storage.db")
+        sqluri = self.app.get_storage(request).sqluri
+        assert sqluri.startswith("sqlite:////tmp/test-sync-storage")
+
         request.host = "some-test-host"
-        self.assertEquals(self.app.get_storage(request).sqluri,
-                          "sqlite:////tmp/some-test-host.db")
-        os.unlink("/tmp/some-test-host.db")
+        sqluri = self.app.get_storage(request).sqluri
+        assert sqluri.startswith("sqlite:////tmp/test-storage-host1")
+
         request.host = "another-test-host"
-        self.assertEquals(self.app.get_storage(request).sqluri,
-                          "sqlite:////tmp/another-test-host.db")
-        os.unlink("/tmp/another-test-host.db")
+        sqluri = self.app.get_storage(request).sqluri
+        assert sqluri.startswith("sqlite:////tmp/test-storage-host2")

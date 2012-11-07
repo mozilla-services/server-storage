@@ -38,10 +38,11 @@ import os
 
 from syncstorage.storage import SyncStorage
 from services.auth import ServicesAuth
-from services.tests.support import TestEnv
+
+import services.tests.support
 
 
-def initenv(config=None):
+def initenv(config=None, **env_args):
     """Reads the config file and instantiates an auth and a storage.
     """
     # pre-registering plugins
@@ -63,7 +64,13 @@ def initenv(config=None):
     from services.auth.dummy import DummyAuth
     ServicesAuth.register(DummyAuth)
 
-    mydir = os.path.dirname(__file__)
-    testenv = TestEnv(ini_path=config, ini_dir=mydir,
-                      load_sections=['auth', 'storage'])
+    env_args['ini_path'] = config
+    env_args.setdefault('ini_dir', os.path.dirname(__file__))
+    env_args.setdefault('load_sections', ['auth', 'storage'])
+    testenv = services.tests.support.TestEnv(**env_args)
     return testenv.ini_dir, testenv.config, testenv.storage, testenv.auth
+
+
+def cleanupenv(config=None, **env_args):
+    env_args.setdefault('ini_dir', os.path.dirname(__file__))
+    return services.tests.support.cleanupenv(config, **env_args)
