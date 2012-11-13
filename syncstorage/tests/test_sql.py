@@ -37,12 +37,14 @@ import json
 import unittest
 import os
 import time
+import threading
 
 from syncstorage.tests.support import initenv, cleanupenv
 from syncstorage.storage.sqlmappers import get_wbo_table_name
 from syncstorage.storage import SyncStorage
-from syncstorage.storage.sql import (SQLStorage, sql_timer_name,
-                                     timed_safe_execute)
+from syncstorage.storage.sql import (SQLStorage,
+                                     create_engine, QueuePoolWithMaxBacklog,
+                                     sql_timer_name, timed_safe_execute)
 from syncstorage.wsgiapp import make_app
 SyncStorage.register(SQLStorage)
 
@@ -314,6 +316,68 @@ class TestSQLStorage(unittest.TestCase):
         msg = json.loads(list(sender.msgs)[-1])
         self.assertEqual(msg.get('type'), 'timer')
         self.assertEqual(msg.get('fields').get('name'), sql_timer_name)
+
+    def test_max_overflow_and_max_backlog(self):
+        # Create an engine with known pool parameters.
+        # Unfortunately we can't load this from a config file, since
+        # pool params are ignored for sqlite databases.
+        engine = create_engine("sqlite:///:memory:",
+            poolclass=QueuePoolWithMaxBacklog,
+            pool_size=2,
+            pool_timeout=1,
+            max_backlog=2,
+            max_overflow=1,
+        )
+
+        # Define a utility function to take a connection from the pool
+        # and hold onto it.  This makes it easy to spawn as a bg thread
+        # and test blocking/timeout behaviour.
+        connections = []
+        errors = []
+
+        def take_connection():
+            try:
+                connections.append(engine.connect())
+            except Exception, e:
+                errors.append(e)
+
+        # The size of the pool is two, so we can take
+        # two connections right away without any error.
+        take_connection()
+        take_connection()
+        self.assertEquals(len(connections), 2)
+        self.assertEquals(len(errors), 0)
+
+        # The pool allows an overflow of 1, so we can
+        # take another, ephemeral connection without any error.
+        take_connection()
+        self.assertEquals(len(connections), 3)
+        self.assertEquals(len(errors), 0)
+
+        # The pool allows a backlog of 2, so we can
+        # spawn two threads that will block waiting for a connection.
+        thread1 = threading.Thread(target=take_connection)
+        thread1.start()
+        thread2 = threading.Thread(target=take_connection)
+        thread2.start()
+        self.assertEquals(len(connections), 3)
+        self.assertEquals(len(errors), 0)
+
+        # The pool is now exhausted and at maximum backlog.
+        # Trying to take another connection fails immediately.
+        t1 = time.time()
+        take_connection()
+        t2 = time.time()
+        self.assertEquals(len(connections), 3)
+        # This checks that it failed immediately rather than timing out.
+        self.assertTrue(t2 - t1 < 0.9)
+        self.assertTrue(len(errors) >= 1)
+
+        # And eventually, the blocked threads will time out.
+        thread1.join()
+        thread2.join()
+        self.assertEquals(len(connections), 3)
+        self.assertEquals(len(errors), 3)
 
 
 def test_suite():

@@ -62,6 +62,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.sql.expression import _generative, Delete, _clone, ClauseList
 from sqlalchemy import util
 from sqlalchemy.sql.compiler import SQLCompiler
+from sqlalchemy.util.queue import Queue
+from sqlalchemy.pool import NullPool, QueuePool
 
 from metlog.decorators.stats import timeit as metlog_timeit
 from metlog.holder import CLIENT_HOLDER
@@ -193,6 +195,59 @@ def _delete(table, whereclause=None, **kwargs):
     return _DeleteOrderBy(table, whereclause, **kwargs)
 
 
+class _QueueWithMaxBacklog(Queue):
+    """SQLAlchemy Queue subclass with a limit on the length of the backlog.
+
+    This base Queue class sets no limit on the number of threads that can be
+    simultaneously blocked waiting for an item on the queue.  This class
+    adds a "max_backlog" parameter that can be used to bound this number.
+    """
+
+    def __init__(self, maxsize=0, max_backlog=-1):
+        self.max_backlog = max_backlog
+        self.cur_backlog = 0
+        Queue.__init__(self, maxsize)
+
+    def get(self, block=True, timeout=None):
+        # The SQLAlchemy Queue class uses a re-entrant mutext by default,
+        # so it's safe to acquire it both here and in the superclass method.
+        with self.mutex:
+            self.cur_backlog += 1
+            try:
+                if self.max_backlog >= 0:
+                    if self.cur_backlog > self.max_backlog:
+                        block = False
+                        timeout = None
+                return Queue.get(self, block, timeout)
+            finally:
+                self.cur_backlog -= 1
+
+
+class QueuePoolWithMaxBacklog(QueuePool):
+    """An SQLAlchemy QueuePool with a limit on the length of the backlog.
+
+    The base QueuePool class sets no limit on the number of threads that can
+    be simultaneously attempting to connect to the database.  This means that
+    a misbehaving database can easily lock up all threads by keeping them
+    waiting in the queue.
+
+    This QueuePool subclass provides a "max_backlog" that limits the number
+    of threads that can be in the queue waiting for a connection.  Once this
+    limit has been reached, any further attempts to acquire a connection will
+    be rejected immediately.
+    """
+
+    def __init__(self, creator, max_backlog=-1, **kwds):
+        QueuePool.__init__(self, creator, **kwds)
+        self._pool = _QueueWithMaxBacklog(self._pool.maxsize, max_backlog)
+
+    def recreate(self):
+        new_self = QueuePool.recreate(self)
+        new_self._pool = _QueueWithMaxBacklog(self._pool.maxsize,
+                                              self._pool.max_backlog)
+        return new_self
+
+
 class SQLStorage(object):
     """Storage plugin implemented using an SQL database.
 
@@ -213,7 +268,7 @@ class SQLStorage(object):
                  use_quota=False, quota_size=0, pool_size=100,
                  pool_recycle=60, reset_on_return=True, create_tables=False,
                  shard=False, shardsize=100,
-                 pool_max_overflow=10, no_pool=False,
+                 pool_max_overflow=10, pool_max_backlog=-1, no_pool=False,
                  pool_timeout=30, **kw):
 
         self.sqluri = sqluri
@@ -223,15 +278,18 @@ class SQLStorage(object):
         # connection pooling.  Pooling doesn't work properly for sqlite so
         # it's disabled for that driver regardless of the value of no_pool.
         if no_pool or self.driver == 'sqlite':
-            from sqlalchemy.pool import NullPool
             self._engine = create_engine(sqluri, poolclass=NullPool,
                                          logging_name='syncserver')
         else:
-            sqlkw = {'pool_size': int(pool_size),
-                        'pool_recycle': int(pool_recycle),
-                        'logging_name': 'syncserver',
-                        'pool_timeout': int(pool_timeout),
-                        'max_overflow': int(pool_max_overflow)}
+            sqlkw = {
+                'poolclass': QueuePoolWithMaxBacklog,
+                'pool_size': int(pool_size),
+                'pool_recycle': int(pool_recycle),
+                'logging_name': 'syncserver',
+                'pool_timeout': int(pool_timeout),
+                'max_overflow': int(pool_max_overflow),
+                'max_backlog': int(pool_max_backlog),
+            }
 
             if self.driver in ('mysql', 'pymsql',
                                'mysql+mysqlconnector'):
