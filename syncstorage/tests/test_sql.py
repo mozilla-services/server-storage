@@ -360,6 +360,7 @@ class TestSQLStorage(unittest.TestCase):
         thread1.start()
         thread2 = threading.Thread(target=take_connection)
         thread2.start()
+        time.sleep(0.1)
         self.assertEquals(len(connections), 3)
         self.assertEquals(len(errors), 0)
 
