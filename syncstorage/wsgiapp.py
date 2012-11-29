@@ -44,7 +44,7 @@ from syncstorage.controller import StorageController
 from syncstorage.storage import get_storage
 
 try:
-    from memcache import Client
+    from pylibmc import Client
 except ImportError:
     Client = None       # NOQA
 
@@ -118,17 +118,18 @@ class StorageServerApp(SyncServerApp):
             host_cfg = self._host_specific(hostname, config)
             self.storages[hostname] = get_storage(host_cfg)
 
-        self.check_blacklist = \
-                self.config.get('storage.check_blacklisted_nodes', False)
-        if self.check_blacklist and Client is not None:
+        # If we need to check node status, then we need to
+        # obtain a memcache client object.
+        self.cache = None
+        self.check_node_status = \
+                self.config.get('storage.check_node_status', False)
+        if self.check_node_status:
+            if Client is None:
+                raise ValueError('The "check_node_status" option '
+                                 'needs a memcached server')
             servers = self.config.get('storage.cache_servers',
                                       '127.0.0.1:11211')
             self.cache = Client(servers.split(','))
-        else:
-            if self.check_blacklist:
-                raise ValueError('The "check_blacklisted_node" option '
-                                 'needs a memcached server')
-            self.cache = None
 
     def get_storage(self, request):
         host = request.host
@@ -137,21 +138,70 @@ class StorageServerApp(SyncServerApp):
         return self.storages[host]
 
     def _before_call(self, request):
-        # let's control if this server is not on the blacklist
-        if not self.check_blacklist:
-            return {}
+        headers = {}
 
-        host = request.host
-        if self.cache.get('down:%s' % host) is not None:
-            # the server is marked as down -- let's exit
-            raise HTTPServiceUnavailable("Server Problem Detected")
+        # If configured to do so, this function can check memcache for
+        # the status of the target node and possibly avoid calling out
+        # to the storage backend.  It looks for a memcache key named
+        # "status:<hostname>" with one of the following values:
+        #
+        #    "down":   the node is explicitly marked as down
+        #    "draining":   the node is being decommissioned
+        #    "unhealthy":  the node has not responded to health checks
+        #    "backoff" or "backoff:NN":  the node is under heavy load and
+        #                                clients should back off for a while.
 
-        backoff = self.cache.get('backoff:%s' % host)
-        if backoff is not None:
-            # the server is marked to back-off requests. We will treat those
-            # but add the header
-            return {'X-Weave-Backoff': str(backoff)}
-        return {}
+        if self.check_node_status:
+
+            # Helper function to create a HTTPServiceUnavailable response.
+            # This takes care of some fiddly details in the API.
+            def resp_service_unavailable(msg):
+                body = "server issue: " + msg
+                headers["Retry-After"] = str(self.retry_after)
+                headers["X-Weave-Backoff"] = str(self.retry_after)
+                raise HTTPServiceUnavailable(headers=headers,
+                                             body_template=body)
+
+            # Get the node name from host header,
+            # and check that it's one we know about.
+            node = request.host
+            if not node:
+                msg = "host header not received from client"
+                raise resp_service_unavailable(msg)
+
+            if node not in self.storages:
+                msg = "database lookup failed"
+                raise resp_service_unavailable(msg)
+
+            status = self.cache.get('status:%s' % request.host)
+            if status is not None:
+
+                # If it's marked as draining then send a 503 response.
+                # XXX TODO: consider sending a 401 to trigger migration?
+                if status == "draining":
+                    msg = "node reassignment"
+                    raise resp_service_unavailable(msg)
+
+                # If it's marked as being down then send a 503 response.
+                if status == "down":
+                    msg = "database marked as down"
+                    raise resp_service_unavailable(msg)
+
+                # If it's marked as being unhealthy then send a 503 response.
+                if status == "unhealthy":
+                    msg = "database is not healthy"
+                    raise resp_service_unavailable(msg)
+
+                # If it's marked for backoff, proceed with the request
+                # but set appropriate headers on the response.
+                if status == "backoff" or status.startswith("backoff:"):
+                    try:
+                        backoff = status.split(":", 1)[1]
+                    except IndexError:
+                        backoff = str(self.retry_after)
+                    headers["X-Weave-Backoff"] = backoff
+
+        return headers
 
     def _debug_server(self, request):
         res = []

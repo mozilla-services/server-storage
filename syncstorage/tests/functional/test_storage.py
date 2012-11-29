@@ -710,40 +710,6 @@ class TestStorage(support.TestWsgiApp):
         self.assertEquals(len(res['success']), 4)
         self.assertEquals(len(res['failed']), 1)
 
-    def test_blacklisted_nodes(self):
-        # This can't be run against a live server.
-        if self.distant:
-            raise SkipTest
-
-        app = get_app(self.app)
-        old = app.config.get('storage.check_blacklisted_nodes', False)
-        app.config['storage.check_blacklisted_nodes'] = True
-        try:
-            if app.cache is None:
-                raise SkipTest   # memcached is probably not installed
-
-            if not app.cache.set('TEST', 1):
-                raise SkipTest   # memcached server is probably down
-
-            # "backoff:server" will add a X-Weave-Backoff header
-            app.cache.set('backoff:localhost:80', 2)
-            try:
-                resp = self.app.get(self.root + '/info/collections')
-                self.assertEquals(resp.headers['X-Weave-Backoff'], '2')
-            finally:
-                app.cache.delete('backoff:localhost:80')
-
-            # "down:server" will make the node unavailable
-            app.cache.set('down:localhost:80', 1)
-            try:
-                resp = self.app.get(self.root + '/info/collections',
-                                    status=503)
-                self.assertTrue("Server Problem Detected" in resp.body)
-            finally:
-                app.cache.delete('down:localhost:80')
-        finally:
-            app.config['storage.check_blacklisted_nodes'] = old
-
     def test_weird_args(self):
         # pushing some data in col2
         wbos = [{'id': str(i), 'payload': _PLD} for i in range(10)]
@@ -781,19 +747,6 @@ class TestStorage(support.TestWsgiApp):
 
         res = self.app.get(self.root + '/storage/passwords?ids=%s' % ids)
         self.assertEqual(res.json, [])
-
-    def test_dependant_options(self):
-        config = dict(self.config)
-        config['storage.check_blacklisted_nodes'] = True
-        from syncstorage import wsgiapp
-        old_client = wsgiapp.Client
-        wsgiapp.Client = None
-        # make sure the app cannot be initialized if it's asked
-        # to check for blacklisted node and memcached is not present
-        try:
-            self.assertRaises(ValueError, support.make_app, config)
-        finally:
-            wsgiapp.Client = old_client
 
     def test_metrics(self):
         # make sure we support any metrics marker on info/collections
