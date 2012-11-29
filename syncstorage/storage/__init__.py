@@ -74,6 +74,10 @@ class SyncStorage(PluginRegistry):
             The plugin name
         """
 
+    @abc.abstractmethod
+    def is_healthy(self):
+        """Check whether the storage backend is healthy and active."""
+
     #
     # Users APIs -- the user id is the email
     #

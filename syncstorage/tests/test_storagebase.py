@@ -44,6 +44,9 @@ class IAmAValidStorage(object):
         """Returns the name of the storage"""
         return 'valid'
 
+    def is_healthy(self):
+        ''
+
     def user_exists(self, user_name):
         ''
 

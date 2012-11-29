@@ -334,6 +334,13 @@ class SQLStorage(object):
         """Return the name of the storage plugin"""
         return 'sql'
 
+    def is_healthy(self):
+        """Check whether the backend is healthy and active."""
+        # This executes a real query but, since there's no user with id zero,
+        # there will be no rows in the result.
+        self.collection_exists(0, "test_collection")
+        return True
+
     def _do_query(self, *args, **kwds):
         """Execute a database query, returning the rowcount."""
         res = timed_safe_execute(self._engine, *args, **kwds)
