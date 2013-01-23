@@ -36,6 +36,7 @@
 import json
 import os
 import unittest
+import base64
 
 from services.tests.support import make_request
 from syncstorage.wsgiapp import make_app
@@ -46,11 +47,21 @@ class TestMetlog(unittest.TestCase):
     def setUp(self):
         config_file = os.path.join(os.path.dirname(__file__), "sync.conf")
         self.app = make_app({"configuration": "file:" + config_file}).app
+        # set up a test user account
+        self.auth = self.app.auth.backend
         self.username = 'arfoo'
+        self.password = 'arpwd'
+        self.auth.create_user(self.username, self.password, "test@moz.com")
+        self.userid = self.auth.get_user_id(self.username)
+        authz_token = base64.b64encode(self.username + ':' + self.password)
+        self.authorization = 'Basic ' + authz_token
+
+    def tearDown(self):
+        self.auth.delete_user(self.userid)
 
     def test_stats_go_out(self):
         path = '/1.1/%s/info/collections' % self.username
-        environ = {'REMOTE_USER': self.username}
+        environ = {'HTTP_AUTHORIZATION': self.authorization}
         request = make_request(path, environ)
         self.app(request)
         sender = self.app.logger.sender
@@ -61,12 +72,12 @@ class TestMetlog(unittest.TestCase):
         self.assertEqual(msg1.get('type'), 'counter')
         msg2 = json.loads(msgs[2])
         self.assertEqual(msg2.get('type'), 'services')
-        self.assertEqual(msg2['fields']['userid'], self.username)
+        self.assertEqual(msg2['fields']['userid'], self.userid)
         self.assertTrue('req_time' in msg2['fields'])
 
     def test_addl_services_data(self):
         path = '/1.1/%s/info/collections' % self.username
-        environ = {'REMOTE_USER': self.username}
+        environ = {'HTTP_AUTHORIZATION': self.authorization}
         request = make_request(path, environ)
         request.user_agent = 'USER_AGENT'
         controller = self.app.controllers['storage']
@@ -90,7 +101,7 @@ class TestMetlog(unittest.TestCase):
         msg2 = json.loads(msgs[2])
         self.assertEqual(msg2.get('type'), 'services')
         expected = data.copy()
-        expected['userid'] = self.username
+        expected['userid'] = self.userid
         expected['req_time'] = msg2['fields']['req_time']
         self.assertEqual(msg2['fields'], expected)
         wrapped_method._fn._fn._fn = orig_inner
