@@ -291,9 +291,9 @@ class SQLStorage(object):
                 'max_backlog': int(pool_max_backlog),
             }
 
-            if self.driver in ('mysql', 'pymsql',
+            if self.driver in ('mysql', 'pymysql',
                                'mysql+mysqlconnector'):
-                sqlkw['reset_on_return'] = reset_on_return
+                sqlkw['pool_reset_on_return'] = reset_on_return
 
             self._engine = create_engine(sqluri, **sqlkw)
 
