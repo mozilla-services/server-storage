@@ -850,7 +850,11 @@ class SQLStorage(object):
     def delete_item(self, user_id, collection_name, item_id,
                     storage_time=None):
         """Deletes an item"""
-        collection_id = self._get_collection_id(user_id, collection_name)
+        collection_id = self._get_collection_id(user_id, collection_name,
+                                                create=False)
+        if collection_id is None:
+            return False
+
         query = self._get_query('DELETE_SOME_USER_WBO', user_id)
         rowcount = self._do_query(query, user_id=user_id, item_id=item_id,
                                   collection_id=collection_id)
@@ -860,7 +864,11 @@ class SQLStorage(object):
                      filters=None, limit=None, offset=None, sort=None,
                      storage_time=None):
         """Deletes items. All items are removed unless item_ids is provided"""
-        collection_id = self._get_collection_id(user_id, collection_name)
+        collection_id = self._get_collection_id(user_id, collection_name,
+                                                create=False)
+        if collection_id is None:
+            return False
+
         wbo = self._get_wbo_table(user_id)
         query = _delete(wbo)
         where = [wbo.c.username == bindparam('user_id'),
