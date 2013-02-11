@@ -517,7 +517,7 @@ class SQLStorage(object):
                 for key in res.keys():
                     if key not in field_names:
                         del res[key]
-        else:
+        elif res is not None:
             # make this a single step
             res = dict([(key, value) for key, value in res.items()
                          if value is not None])

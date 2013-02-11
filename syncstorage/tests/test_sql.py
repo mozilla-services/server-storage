@@ -317,6 +317,15 @@ class TestSQLStorage(unittest.TestCase):
         self.assertEqual(msg.get('type'), 'timer')
         self.assertEqual(msg.get('fields').get('name'), sql_timer_name)
 
+    def test_get_collection_with_no_create(self):
+        # By default, get_collection() will create the collection on demand.
+        c = self.storage.get_collection(1, "newcol1")
+        self.assertEquals(c["name"], "newcol1")
+        # Using create=False causes it not to be created.
+        c = self.storage.get_collection(1, "newcol2", create=False)
+        self.assertEquals(c, None)
+        
+
     def test_max_overflow_and_max_backlog(self):
         # Create an engine with known pool parameters.
         # Unfortunately we can't load this from a config file, since
