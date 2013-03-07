@@ -14,7 +14,7 @@ echo "==> syncing files to workers"
 xapply "rsync $source_dir/{StressTest.conf,stress.py,Makefile} %1:$dest_dir/" $workers
 
 echo "==> building virtualenvs"
-xapply "ssh %1 cd $dest_dir \; find . -name 'loadtest*' | xargs rm; make build" $workers
+xapply "ssh %1 \"cd $dest_dir && find . -name 'loadtest*' | xargs rm -f && make build\"" $workers
 
 echo "==> running load"
 while :; do
