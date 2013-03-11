@@ -9,7 +9,7 @@ Beaker == 1.6.4
 python-memcached == 1.48
 simplejson == 2.6.2
 Routes == 1.13
-SQLAlchemy == 0.7.9
+SQLAlchemy == 0.7.10
 WSGIProxy == 0.2.2
 recaptcha-client == 1.0.6
 pylibmc == 1.2.3

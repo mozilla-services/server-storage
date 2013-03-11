@@ -56,6 +56,7 @@ import urlparse
 from time import time
 from collections import defaultdict
 
+import sqlalchemy.event
 from sqlalchemy.sql import (text as sqltext, select, bindparam, insert, update,
                             and_)
 from sqlalchemy.exc import IntegrityError
@@ -248,6 +249,9 @@ class QueuePoolWithMaxBacklog(QueuePool):
         return new_self
 
 
+SHARED_POOLS = {}
+
+
 class SQLStorage(object):
     """Storage plugin implemented using an SQL database.
 
@@ -269,16 +273,23 @@ class SQLStorage(object):
                  pool_recycle=60, reset_on_return=True, create_tables=False,
                  shard=False, shardsize=100,
                  pool_max_overflow=10, pool_max_backlog=-1, no_pool=False,
-                 pool_timeout=30, **kw):
+                 pool_timeout=30, use_shared_pool=False, **kw):
 
+        parsed_sqluri = urlparse.urlparse(sqluri)
         self.sqluri = sqluri
-        self.driver = urlparse.urlparse(sqluri).scheme
+        self.driver = parsed_sqluri.scheme
 
         # Create the SQLAlchemy engine, using the given parameters for
         # connection pooling.  Pooling doesn't work properly for sqlite so
         # it's disabled for that driver regardless of the value of no_pool.
+        # If use_shared_pool is True, then a single pool is used per db
+        # hostname.
         if no_pool or self.driver == 'sqlite':
             self._engine = create_engine(sqluri, poolclass=NullPool,
+                                         logging_name='syncserver')
+        elif use_shared_pool and parsed_sqluri.hostname in SHARED_POOLS:
+            pool = SHARED_POOLS[parsed_sqluri.hostname]
+            self._engine = create_engine(sqluri, pool=pool,
                                          logging_name='syncserver')
         else:
             sqlkw = {
@@ -296,6 +307,18 @@ class SQLStorage(object):
                 sqlkw['pool_reset_on_return'] = reset_on_return
 
             self._engine = create_engine(sqluri, **sqlkw)
+
+        # If a shared pool is in use, set up an event listener to switch to
+        # the proper database each time a query is executed.
+        if use_shared_pool:
+            if parsed_sqluri.hostname not in SHARED_POOLS:
+                SHARED_POOLS[parsed_sqluri.hostname] = self._engine.pool
+
+            def switch_db(conn, cursor, query, *junk):
+                cursor.execute("use %s" % (self._engine.url.database,))
+
+            sqlalchemy.event.listen(self._engine, 'before_cursor_execute',
+                                    switch_db)
 
         # Bind the table metadata to our engine.
         # This is also a good time to create tables if they're missing.
