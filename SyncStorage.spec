@@ -52,6 +52,11 @@ touch %{buildroot}%{_localstatedir}/log/syncstorage.log
 # the app
 python2.6 setup.py install --single-version-externally-managed --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES
 
+# This works around a problem with rpmbuild, where it pre-gnerates .pyo
+# files that aren't included in the INSTALLED_FILES list by bdist_rpm.
+cat INSTALLED_FILES | grep '.pyc$' | sed 's/.pyc$/.pyo/' >> INSTALLED_FILES
+
+
 %clean
 rm -rf $RPM_BUILD_ROOT
 
