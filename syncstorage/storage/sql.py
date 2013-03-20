@@ -273,7 +273,8 @@ class SQLStorage(object):
                  pool_recycle=60, reset_on_return=True, create_tables=False,
                  shard=False, shardsize=100,
                  pool_max_overflow=10, pool_max_backlog=-1, no_pool=False,
-                 pool_timeout=30, use_shared_pool=False, **kw):
+                 pool_timeout=30, use_shared_pool=False,
+                 echo_pool=False, **kw):
 
         parsed_sqluri = urlparse.urlparse(sqluri)
         self.sqluri = sqluri
@@ -300,6 +301,7 @@ class SQLStorage(object):
                 'pool_timeout': int(pool_timeout),
                 'max_overflow': int(pool_max_overflow),
                 'max_backlog': int(pool_max_backlog),
+                'echo_pool': bool(echo_pool),
             }
 
             if self.driver in ('mysql', 'pymysql',
