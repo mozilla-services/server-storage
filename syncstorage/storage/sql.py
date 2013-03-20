@@ -248,6 +248,11 @@ class QueuePoolWithMaxBacklog(QueuePool):
                                               self._pool.max_backlog)
         return new_self
 
+    def _do_get(self):
+        c = QueuePool._do_get(self)
+        self.logger.debug("QueuePoolWithMaxBacklog status: %s", self.status())
+        return c
+
 
 SHARED_POOLS = {}
 
