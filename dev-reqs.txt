@@ -21,7 +21,7 @@ repoze.lru
 repoze.who
 zope.deprecation
 zope.interface
-metlog-py >= 0.9.6
+metlog-py >= 0.10
 metlog-cef
 nose
 docopt
