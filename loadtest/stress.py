@@ -171,12 +171,14 @@ class StressTest(FunkLoadTestCase):
 
     def _pick_node(self):
         node = None
+        # If a DB is down, add its number in here; e.g. down_dbs = [3,6]
+        down_dbs = []
         while True:
             node = random.randint(1, 80)
-            # sync1.db is down?
-            #if 1 <= node <= 10:
-            #    continue
-            break
+            # Hosts 1 through 10 map to DB 1, 11 through 20 DB db 2, etc.
+            # This maps the node number back to the db number.
+            if ((node - 1) / 10) + 1 not in down_dbs:
+                break
         return "https://stage-sync%i.services.mozilla.com" % node
 
     def _pick_user(self):
