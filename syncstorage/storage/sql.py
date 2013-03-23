@@ -63,7 +63,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.sql.expression import _generative, Delete, _clone, ClauseList
 from sqlalchemy import util
 from sqlalchemy.sql.compiler import SQLCompiler
-from sqlalchemy.util.queue import Queue
+from sqlalchemy.util import queue as sqla_queue
 from sqlalchemy.pool import NullPool, QueuePool
 
 from metlog.decorators.stats import timeit as metlog_timeit
@@ -81,7 +81,9 @@ from services.util import (time2bigint, bigint2time, round_time,
 from syncstorage.wbo import WBO
 
 
-sql_timer_name = 'syncstorage.storage.sql.timed_safe_execute'
+METLOG_PREFIX = 'syncstorage.storage.sql.'
+
+sql_timer_name = METLOG_PREFIX + 'timed_safe_execute'
 timed_safe_execute = metlog_timeit(sql_timer_name)(safe_execute)
 
 _KB = float(1024)
@@ -196,7 +198,7 @@ def _delete(table, whereclause=None, **kwargs):
     return _DeleteOrderBy(table, whereclause, **kwargs)
 
 
-class _QueueWithMaxBacklog(Queue):
+class _QueueWithMaxBacklog(sqla_queue.Queue):
     """SQLAlchemy Queue subclass with a limit on the length of the backlog.
 
     This base Queue class sets no limit on the number of threads that can be
@@ -207,19 +209,32 @@ class _QueueWithMaxBacklog(Queue):
     def __init__(self, maxsize=0, max_backlog=-1):
         self.max_backlog = max_backlog
         self.cur_backlog = 0
-        Queue.__init__(self, maxsize)
+        sqla_queue.Queue.__init__(self, maxsize)
 
     def get(self, block=True, timeout=None):
         # The SQLAlchemy Queue class uses a re-entrant mutext by default,
         # so it's safe to acquire it both here and in the superclass method.
         with self.mutex:
+            backlog_exceeded = False
             self.cur_backlog += 1
             try:
+                # Only allow a blocking get() if it won't exceed max backlog.
                 if self.max_backlog >= 0:
                     if self.cur_backlog > self.max_backlog:
+                        backlog_exceeded = True
                         block = False
                         timeout = None
-                return Queue.get(self, block, timeout)
+                return sqla_queue.Queue.get(self, block, timeout)
+            except sqla_queue.Empty:
+                # Collect statistics on attempts that time out, and attempts
+                # that fail immediately due to excess backlog.  They both
+                # give the same exception, so we need a flag to differentiate.
+                if backlog_exceeded:
+                    counter_name = METLOG_PREFIX + 'pool.backlog_exceeded'
+                else:
+                    counter_name = METLOG_PREFIX + 'pool.timeout'
+                CLIENT_HOLDER.default_client.incr(counter_name)
+                raise
             finally:
                 self.cur_backlog -= 1
 
@@ -239,15 +254,25 @@ class QueuePoolWithMaxBacklog(QueuePool):
     """
 
     def __init__(self, creator, max_backlog=-1, **kwds):
-        QueuePool.__init__(self, creator, **kwds)
+        def logging_creator(*args, **kwds):
+            counter_name = METLOG_PREFIX + '.pool.new_connection'
+            CLIENT_HOLDER.default_client.incr(counter_name)
+            return creator(*args, **kwds)
+        QueuePool.__init__(self, logging_creator, **kwds)
         self._pool = _QueueWithMaxBacklog(self._pool.maxsize, max_backlog)
 
     def recreate(self):
+        CLIENT_HOLDER.default_client.incr(METLOG_PREFIX + 'pool.recreate')
         new_self = QueuePool.recreate(self)
         new_self._pool = _QueueWithMaxBacklog(self._pool.maxsize,
                                               self._pool.max_backlog)
         return new_self
 
+    def dispose(self):
+        CLIENT_HOLDER.default_client.incr(METLOG_PREFIX + 'pool.dispose')
+        return QueuePool.dispose(self)
+
+    @metlog_timeit(METLOG_PREFIX + 'pool.get')
     def _do_get(self):
         c = QueuePool._do_get(self)
         self.logger.debug("QueuePoolWithMaxBacklog status: %s", self.status())
