@@ -254,10 +254,16 @@ class QueuePoolWithMaxBacklog(QueuePool):
     """
 
     def __init__(self, creator, max_backlog=-1, **kwds):
-        def logging_creator(*args, **kwds):
-            counter_name = METLOG_PREFIX + '.pool.new_connection'
-            CLIENT_HOLDER.default_client.incr(counter_name)
-            return creator(*args, **kwds)
+        # Wrap the creator callback with some metrics logging, unless it
+        # has already been wrapped.
+        if getattr(creator, "has_metlog_wrapper", False):
+            logging_creator = creator
+        else:
+            def logging_creator(*args, **kwds):
+                counter_name = METLOG_PREFIX + '.pool.new_connection'
+                CLIENT_HOLDER.default_client.incr(counter_name)
+                return creator(*args, **kwds)
+            logging_creator.has_metlog_wrapper = True
         QueuePool.__init__(self, logging_creator, **kwds)
         self._pool = _QueueWithMaxBacklog(self._pool.maxsize, max_backlog)
 
