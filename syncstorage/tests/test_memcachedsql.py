@@ -71,6 +71,12 @@ if MEMCACHED:
 
 class TestMemcachedSQLStorage(unittest.TestCase):
 
+    STORAGE_CONFIG = {
+        'use_quota': True,
+        'quota_size': 5120,
+        'create_tables': True,
+    }
+
     def setUp(self):
         if not MEMCACHED:
             raise SkipTest
@@ -83,14 +89,11 @@ class TestMemcachedSQLStorage(unittest.TestCase):
         fd, self.dbfile = mkstemp()
         os.close(fd)
 
-        kw = {'sqluri': 'sqlite:///%s' % self.dbfile,
-              'use_quota': True,
-              'quota_size': 5120,
-              'create_tables': True}
-
         self.fn = 'syncstorage.storage.memcachedsql.MemcachedSQLStorage'
 
-        self.storage = SyncStorage.get(self.fn, **kw)
+        kwds = self.STORAGE_CONFIG.copy()
+        kwds['sqluri'] = 'sqlite:///%s' % self.dbfile
+        self.storage = SyncStorage.get(self.fn, **kwds)
 
         # make sure we have the standard collections in place
 
@@ -417,9 +420,33 @@ class TestMemcachedSQLStorage(unittest.TestCase):
         self.assertEquals(storage.get_total_size(_UID, True), 0)
 
 
+
+# This tests the MirroredCacheManager functionality by double-writing to
+# the same memcache instance.  It's much easier than arranging for two
+# memcache servers to be present, but it means that sizes can get incremeted
+# twice.  So we have to disable a couple of tests.
+
+class TestMirroredMemcachedSQLStorage(TestMemcachedSQLStorage):
+
+    STORAGE_CONFIG = {
+        'use_quota': True,
+        'quota_size': 5120,
+        'create_tables': True,
+        'cache_servers': ['localhost:11211'],
+        'mirrored_cache_servers': ['localhost:11211'],
+    }
+
+    def test_meta_global(self):
+        pass
+
+    def test_size(self):
+        pass
+
+
 def test_suite():
     suite = unittest.TestSuite()
     suite.addTest(unittest.makeSuite(TestMemcachedSQLStorage))
+    suite.addTest(unittest.makeSuite(TestMirroredMemcachedSQLStorage))
     return suite
 
 if __name__ == "__main__":

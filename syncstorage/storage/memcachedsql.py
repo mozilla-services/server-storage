@@ -50,7 +50,9 @@ from services.util import round_time
 
 from syncstorage.storage.sql import SQLStorage
 from syncstorage.storage.sqlmappers import wbo
-from syncstorage.storage.cachemanager import CacheManager, _key
+from syncstorage.storage.cachemanager import (CacheManager,
+                                              MirroredCacheManager,
+                                              _key)
 
 # Recalculate quota at most once per hour.
 QUOTA_RECALCULATION_PERIOD = 60 * 60
@@ -84,6 +86,7 @@ class MemcachedSQLStorage(SQLStorage):
     def __init__(self, sqluri, standard_collections=False,
                  use_quota=False, quota_size=0, pool_size=100,
                  pool_recycle=3600, cache_servers=None,
+                 mirrored_cache_servers=None,
                  create_tables=False, shard=False, shardsize=100,
                  memcached_json=False, **kw):
         self.sqlstorage = super(MemcachedSQLStorage, self)
@@ -95,11 +98,18 @@ class MemcachedSQLStorage(SQLStorage):
             cache_servers = [cache_servers]
         elif cache_servers is None:
             cache_servers = ['127.0.0.1:11211']
+        if isinstance(mirrored_cache_servers, str):
+            mirrored_cache_servers = [mirrored_cache_servers]
         extra_kw = {}
         if memcached_json:
             extra_kw['pickler'] = _JSONDumper
             extra_kw['unpickler'] = _JSONDumper
-        self.cache = CacheManager(cache_servers, **extra_kw)
+        if mirrored_cache_servers is None:
+            self.cache = CacheManager(cache_servers, **extra_kw)
+        else:
+            self.cache = MirroredCacheManager(cache_servers,
+                                              mirrored_cache_servers,
+                                              **extra_kw)
 
     @classmethod
     def get_name(self):

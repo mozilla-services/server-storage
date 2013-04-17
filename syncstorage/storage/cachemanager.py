@@ -286,3 +286,22 @@ class CacheManager(object):
         except BackendError:
             total = None
         return total
+
+
+class MirroredCacheManager(CacheManager):
+
+    def __init__(self, servers, mirror_servers, *args, **kwds):
+        super(MirroredCacheManager, self).__init__(servers, *args, **kwds)
+        self._mirror = CacheManager(mirror_servers, *args, **kwds)
+
+    def delete(self, key):
+        self._mirror.delete(key)
+        return super(MirroredCacheManager, self).delete(key)
+
+    def incr(self, key, size=1):
+        self._mirror.incr(key, size)
+        return super(MirroredCacheManager, self).incr(key, size)
+
+    def set(self, key, value):
+        self._mirror.set(key, value)
+        return super(MirroredCacheManager, self).set(key, value)
