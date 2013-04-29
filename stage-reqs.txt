@@ -25,3 +25,4 @@ metlog-py == 0.10
 metlog-cef == 0.2
 nose==1.2.1
 docopt==0.5
+scrypt == 0.6.1
