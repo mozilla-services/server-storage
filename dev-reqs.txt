@@ -25,4 +25,3 @@ metlog-py >= 0.10
 metlog-cef
 nose
 docopt
-scrypt

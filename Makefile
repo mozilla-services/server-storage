@@ -55,7 +55,12 @@ build:
 	$(INSTALL) coverage
 	$(INSTALL) WebTest
 	$(BUILDAPP) -c $(CHANNEL) $(PYPIOPTIONS) $(DEPS)
-
+	# py-scrypt doesn't play nicely with pypi2rpm
+	# so we can't list it in the requirements files.
+	mkdir -p ${BUILD_TMP}
+	cd ${BUILD_TMP}; tar -xzvf $(CURDIR)/upstream-deps/py-scrypt-0.6.0.tar.gz
+	$(INSTALL) ${BUILD_TMP}
+	rm -rf ${BUILD_TMP}
 
 update:
 	$(BUILDAPP) -c $(CHANNEL) $(PYPIOPTIONS) $(DEPS)
@@ -70,13 +75,16 @@ build_rpms:
 	rm -rf rpms
 	mkdir -p ${BUILD_TMP}
 	$(BUILDRPMS) -c $(RPM_CHANNEL) $(PYPIOPTIONS) $(DEPS)
+	# py-scrypt doesn't play nicely with pypi2rpm.
+	cd ${BUILD_TMP}; tar -xzvf $(CURDIR)/upstream-deps/py-scrypt-0.6.0.tar.gz
+	cd ${BUILD_TMP}; python setup.py  --command-packages=pypi2rpm.command bdist_rpm2 --binary-only --name=python26-scrypt --dist-dir=$(CURDIR)/rpms
 	# Meliae doesn't play nicely with pypi2rpm.
 	# It also eneds to be patched to work with ctypes.
 	# Ergo, we have to build it by hand.
 	$(INSTALL) cython
 	wget -O ${BUILD_TMP}/meliae-0.4.0.tar.gz https://launchpad.net/meliae/trunk/0.4/+download/meliae-0.4.0.tar.gz
 	cd ${BUILD_TMP}; tar -xzvf meliae-0.4.0.tar.gz
-	patch ${BUILD_TMP}/meliae-0.4.0/meliae/_scanner_core.c ./meliae-scanner-assertion-fix.patch
+	patch ${BUILD_TMP}/meliae-0.4.0/meliae/_scanner_core.c ./upstream-deps/meliae-scanner-assertion-fix.patch
 	$(INSTALL) ${BUILD_TMP}/meliae-0.4.0
 	cd ${BUILD_TMP}/meliae-0.4.0; python setup.py  --command-packages=pypi2rpm.command bdist_rpm2 --binary-only --name=python26-meliae --dist-dir=$(CURDIR)/rpms
 	rm -rf ${BUILD_TMP}
