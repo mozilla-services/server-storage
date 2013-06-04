@@ -78,6 +78,15 @@ build_rpms:
 	# py-scrypt doesn't play nicely with pypi2rpm.
 	cd ${BUILD_TMP}; tar -xzvf $(CURDIR)/upstream-deps/py-scrypt-0.6.0.tar.gz
 	cd ${BUILD_TMP}; python setup.py  --command-packages=pypi2rpm.command bdist_rpm2 --binary-only --name=python26-scrypt --dist-dir=$(CURDIR)/rpms
+	# PyMySQL doesn't play nicely with gevent timeouts.
+	# Patch it to fix, until the fix gets in upstream.
+	#   https://github.com/petehunt/PyMySQL/pull/148
+	# The PyPI SSL certificate is wonky, so check md5sum of file by hand.
+	wget -O ${BUILD_TMP}/PyMySQL-0.5.tar.gz --no-check-certificate https://pypi.python.org/packages/source/P/PyMySQL/PyMySQL-0.5.tar.gz
+	if [ `md5sum ${BUILD_TMP}/PyMySQL-0.5.tar.gz | cut -d ' ' -f 1` != '125e8a3449e05afcb04874a19673426b' ]; then false; fi
+	cd ${BUILD_TMP}; tar -xzvf PyMySQL-0.5.tar.gz
+	patch ${BUILD_TMP}/PyMySQL-0.5/pymysql/cursors.py ./upstream-deps/pymysql-no-bare-except-clauses.patch
+	cd ${BUILD_TMP}/PyMySQL-0.5; python setup.py  --command-packages=pypi2rpm.command bdist_rpm2 --binary-only --name=python26-pymysql --dist-dir=$(CURDIR)/rpms
 	# Meliae doesn't play nicely with pypi2rpm.
 	# It also eneds to be patched to work with ctypes.
 	# Ergo, we have to build it by hand.
