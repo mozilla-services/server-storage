@@ -1,0 +1,96 @@
+diff -uaNr pymysql-orig/connections.py pymysql/connections.py
+--- pymysql-orig/connections.py	2013-06-06 12:07:13.822342520 +1000
++++ pymysql/connections.py	2013-06-06 12:08:03.720925233 +1000
+@@ -471,7 +471,7 @@
+             def _config(key, default):
+                 try:
+                     return cfg.get(read_default_group,key)
+-                except:
++                except Exception:
+                     return default
+ 
+             user = _config("user",user)
+@@ -552,7 +552,7 @@
+             self._execute_command(COM_QUERY, "SET AUTOCOMMIT = %s" % \
+                                       self.escape(value))
+             self.read_packet()
+-        except:
++        except Exception:
+             exc,value,tb = sys.exc_info()
+             self.errorhandler(None, exc, value)
+ 
+@@ -561,7 +561,7 @@
+         try:
+             self._execute_command(COM_QUERY, "COMMIT")
+             self.read_packet()
+-        except:
++        except Exception:
+             exc,value,tb = sys.exc_info()
+             self.errorhandler(None, exc, value)
+ 
+@@ -570,7 +570,7 @@
+         try:
+             self._execute_command(COM_QUERY, "ROLLBACK")
+             self.read_packet()
+-        except:
++        except Exception:
+             exc,value,tb = sys.exc_info()
+             self.errorhandler(None, exc, value)
+ 
+@@ -618,7 +618,7 @@
+         arg = struct.pack('<I', thread_id)
+         try:
+             self._execute_command(COM_PROCESS_KILL, arg)
+-        except:
++        except Exception:
+             exc,value,tb = sys.exc_info()
+             self.errorhandler(None, exc, value)
+             return
+@@ -629,7 +629,7 @@
+         ''' Check if the server is alive '''
+         try:
+             self._execute_command(COM_PING, "")
+-        except:
++        except Exception:
+             if reconnect:
+                 self._connect()
+                 return self.ping(False)
+@@ -648,7 +648,7 @@
+                                       self.escape(charset))
+                 self.read_packet()
+                 self.charset = charset
+-        except:
++        except Exception:
+             exc,value,tb = sys.exc_info()
+             self.errorhandler(None, exc, value)
+ 
+@@ -814,7 +814,7 @@
+         self.server_version = data[i:server_end].decode(self.charset)
+ 
+         i = server_end + 1
+-        self.server_thread_id = struct.unpack('<h', data[i:i+2])
++        self.server_thread_id = struct.unpack('<I', data[i:i+4])
+ 
+         i += 4
+         self.salt = data[i:i+8]
+diff -uaNr pymysql-orig/cursors.py pymysql/cursors.py
+--- pymysql-orig/cursors.py	2013-06-06 12:07:13.818342634 +1000
++++ pymysql/cursors.py	2013-06-06 12:07:24.274044059 +1000
+@@ -49,7 +49,7 @@
+         try:
+             while self.nextset():
+                 pass
+-        except:
++        except Exception:
+             pass
+ 
+         self.connection = None
+@@ -110,7 +110,7 @@
+         result = 0
+         try:
+             result = self._query(query)
+-        except:
++        except Exception:
+             exc, value, tb = exc_info()
+             del tb
+             self.messages.append((exc,value))

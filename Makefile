@@ -85,7 +85,7 @@ build_rpms:
 	wget -O ${BUILD_TMP}/PyMySQL-0.5.tar.gz --no-check-certificate https://pypi.python.org/packages/source/P/PyMySQL/PyMySQL-0.5.tar.gz
 	if [ `md5sum ${BUILD_TMP}/PyMySQL-0.5.tar.gz | cut -d ' ' -f 1` != '125e8a3449e05afcb04874a19673426b' ]; then false; fi
 	cd ${BUILD_TMP}; tar -xzvf PyMySQL-0.5.tar.gz
-	patch ${BUILD_TMP}/PyMySQL-0.5/pymysql/cursors.py ./upstream-deps/pymysql-no-bare-except-clauses.patch
+	cd ${BUILD_TMP}/PyMySQL-0.5/pymysql ; patch -p1 < $(CURDIR)/upstream-deps/pymysql-fixes.patch
 	cd ${BUILD_TMP}/PyMySQL-0.5; python setup.py  --command-packages=pypi2rpm.command bdist_rpm2 --binary-only --name=python26-pymysql --dist-dir=$(CURDIR)/rpms
 	# Meliae doesn't play nicely with pypi2rpm.
 	# It also eneds to be patched to work with ctypes.
