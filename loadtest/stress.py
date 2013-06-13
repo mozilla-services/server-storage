@@ -129,7 +129,7 @@ class StressTest(FunkLoadTestCase):
             self.logi("about to GET (x=%d) %s" % (x, url))
             response = self.get(url, params)
 
-        # PUT requests with 100 WBOs batched together
+        # PUT requests with 10 WBOs batched together
         num_requests = self._pick_weighted_count(post_count_distribution)
         cols = random.sample(collections, num_requests)
         self.setOkCodes([200])
