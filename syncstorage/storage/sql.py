@@ -92,17 +92,26 @@ _KB = float(1024)
 # common collection names.  This is the canonical list of such names.
 # Non-standard collections will be allocated IDs starting from the
 # highest ID in this collection.
-# XXX: some names here are incorrect; we need to change "client" to "clients"
-# "key" to "keys" at some point.  See Bug 688623
-# XXX: we need to reserve ids 100 and above for custom collections, so
-# that there's room to add new standard collections as needed.
-_STANDARD_COLLECTIONS = {1: 'client', 2: 'crypto', 3: 'forms', 4: 'history',
-                         5: 'key', 6: 'meta', 7: 'bookmarks', 8: 'prefs',
-                         9: 'tabs', 10: 'passwords'}
+#
+# The original set of collection names was buggy, having "client" and "key"
+# rather than "clients" and "keys".  We have to keep it for backwards compat
+# reasons, but new deploys should use the "fixed" set of keys.
+#
+# See https://bugzilla.mozilla.org/show_bug.cgi?id=688623 for details.
+#
+STANDARD_COLLECTIONS = {1: 'client', 2: 'crypto', 3: 'forms', 4: 'history',
+                        5: 'key', 6: 'meta', 7: 'bookmarks', 8: 'prefs',
+                        9: 'tabs', 10: 'passwords'}
 
 STANDARD_COLLECTIONS_NAMES = dict((value, key) for key, value in
-                                   _STANDARD_COLLECTIONS.items())
+                                   STANDARD_COLLECTIONS.items())
 
+FIXED_COLLECTIONS = {1: 'clients', 2: 'crypto', 3: 'forms', 4: 'history',
+                     5: 'keys', 6: 'meta', 7: 'bookmarks', 8: 'prefs',
+                     9: 'tabs', 10: 'passwords', 11: 'addons'}
+
+FIXED_COLLECTIONS_NAMES = dict((value, key) for key, value in
+                                FIXED_COLLECTIONS.items())
 
 def _roundedbigint(value):
     return time2bigint(round_time(value))
@@ -297,6 +306,8 @@ class SQLStorage(object):
 
         * standard_collections:  use fixed pre-determined ids for common
                                  collection names
+        * fixed_collections:     use the updated fixed pre-determined ids for
+                                 common collection names
         * create_tables:         create the database tables if they don't
                                  exist at startup
         * use_quota/quota_size:  limit per-user storage to a specific quota
@@ -304,7 +315,8 @@ class SQLStorage(object):
 
     """
 
-    def __init__(self, sqluri, standard_collections=False,
+    def __init__(self, sqluri,
+                 standard_collections=False, fixed_collections=False,
                  use_quota=False, quota_size=0, pool_size=100,
                  pool_recycle=60, reset_on_return=True, create_tables=False,
                  shard=False, shardsize=100,
@@ -366,6 +378,7 @@ class SQLStorage(object):
                 table.create(checkfirst=True)
         self.engine_name = self._engine.name
         self.standard_collections = standard_collections
+        self.fixed_collections = fixed_collections
         self.use_quota = use_quota
         self.quota_size = int(quota_size)
         self.shard = shard
@@ -380,6 +393,21 @@ class SQLStorage(object):
             _wbo.metadata.bind = self._engine
             if create_tables:
                 _wbo.create(checkfirst=True)
+
+        # If using a fixed set of collection names, take
+        # a local reference to the appropriate set.
+        if standard_collections:
+            if fixed_collections:
+                err = "Can't use both standard and fixed collection names"
+                raise ValueError(msg)
+            self._collections_by_id = STANDARD_COLLECTIONS
+            self._collections_by_name = STANDARD_COLLECTIONS_NAMES
+        elif fixed_collections:
+            self._collections_by_id = FIXED_COLLECTIONS
+            self._collections_by_name = FIXED_COLLECTIONS_NAMES
+        else:
+            self._collections_by_id = None
+            self._collections_by_name = None
 
         # A per-user cache for collection metadata.
         # This is to avoid looking up the collection name <=> id mapping
@@ -477,9 +505,9 @@ class SQLStorage(object):
 
     def _get_collection_id(self, user_id, collection_name, create=True):
         """Returns a collection id, given the name."""
-        if (self.standard_collections and
-            collection_name in STANDARD_COLLECTIONS_NAMES):
-            return STANDARD_COLLECTIONS_NAMES[collection_name]
+        if self._collections_by_name is not None:
+            if collection_name in self._collections_by_name:
+                return self._collections_by_name[collection_name]
 
         # custom collection
         data = self.get_collection(user_id, collection_name,
@@ -531,9 +559,8 @@ class SQLStorage(object):
         values['userid'] = user_id
         values['name'] = collection_name
 
-        if self.standard_collections:
-            ids = _STANDARD_COLLECTIONS.keys()
-            min_id = max(ids) + 1
+        if self._collections_by_id is not None:
+            min_id = 100
         else:
             min_id = 0
 
@@ -623,9 +650,9 @@ class SQLStorage(object):
         self._temp_cache.pop(user_id, None)
 
     def _collid2name(self, user_id, collection_id):
-        if (self.standard_collections and
-            collection_id in _STANDARD_COLLECTIONS):
-            return _STANDARD_COLLECTIONS[collection_id]
+        if self._collections_by_id is not None:
+            if collection_id in self._collections_by_id:
+                return self._collections_by_id[collection_id]
 
         # custom collections
         def _coll():
@@ -838,9 +865,6 @@ class SQLStorage(object):
 
         Returns a list of success or failures.
         """
-        if not self.standard_collections:
-            self.set_collection(user_id, collection_name)
-
         if storage_time is None:
             storage_time = round_time()
 

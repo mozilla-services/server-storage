@@ -69,7 +69,7 @@ class TestSQLStorage(unittest.TestCase):
         assert self.sql_driver in ('mysql', 'sqlite', 'pymysql')
 
         # make sure we have the standard collections in place
-        for name in ('client', 'crypto', 'forms', 'history', 'key', 'meta',
+        for name in ('clients', 'crypto', 'forms', 'history', 'keys', 'meta',
                      'bookmarks', 'prefs', 'tabs', 'passwords'):
             self.storage.set_collection(_UID, name)
 
