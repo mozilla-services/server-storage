@@ -3,12 +3,12 @@
 # build virtualenv
 build:
 	virtualenv --no-site-packages .
-	bin/pip install funkload
+	bin/pip install https://github.com/mozilla-services/loads/archive/master.zip
 
 # run a single test, for sanity-checking
 test:
-	bin/fl-run-test stress.py
+	bin/loads-runner stress.StressTest.test_storage_session
 
-# run actual funkload bench (called from dist.sh over ssh)
+# run actual bench (called from dist.sh over ssh)
 bench:
-	while :; do bin/fl-run-bench -f stress.py StressTest.test_storage_session; done
+	while :; do bin/loads-runner -u 50 -c 100 stress.StressTest.test_storage_session; done

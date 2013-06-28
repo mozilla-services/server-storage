@@ -39,12 +39,9 @@ Load test for the Storage server
 import os
 import base64
 import random
-import json
 import time
 
-from funkload.FunkLoadTestCase import FunkLoadTestCase
-from funkload.utils import Data
-
+from loads import TestCase
 VERSION = '1.1'
 
 # The collections to operate on.
@@ -74,82 +71,61 @@ delete_count_distribution = [99, 1, 0, 0, 0]
 deleteall_probability = 1 / 100.
 
 
-class StressTest(FunkLoadTestCase):
+class StressTest(TestCase):
 
-    def setUp(self):
-        pass
+    def __init__(self, *args, **kwds):
+        self._pick_node()
+        super(StressTest, self).__init__(*args, **kwds)
 
-    def _browse(self, url_in, params_in=None, description=None, ok_codes=None,
-                method='post', *args, **kwds):
-        args = (url_in, params_in, description, ok_codes, method) + args
-        self.logi("%s: %s" % (method.upper(), url_in))
-        try:
-            result = super(StressTest, self)._browse(*args, **kwds)
-        except Exception, e:
-            self.logi("    FAIL: " + url_in + " " + repr(e))
-            raise
-        else:
-            self.logi("    OK: " + url_in + " " + repr(result))
-            return result
+    def set_auth(self, username, password='password'):
+        self.session.auth = (username, password)
 
     def test_storage_session(self):
         username = self._pick_user()
-        password = "password"
-        node = self._pick_node()
-        self.logi("choosing node %s" % (node))
-        self.setBasicAuth(username, password)
+        self.set_auth(username)
 
         # Always GET /username/info/collections
-        self.setOkCodes([200, 404])
-        url = node + "/%s/%s/info/collections" % (VERSION, username)
-        response = self.get(url)
+        url = "/%s/%s/info/collections" % (VERSION, username)
+        response = self.app.get(url, status=[200, 404])
 
         # GET requests to meta/global.
         num_requests = self._pick_weighted_count(metaglobal_count_distribution)
-        self.setOkCodes([200, 404])
         for x in range(num_requests):
-            url = node + "/%s/%s/storage/meta/global" % (VERSION, username)
-            response = self.get(url)
-            if response.code == 404:
+            url = "/%s/%s/storage/meta/global" % (VERSION, username)
+            response = self.app.get(url, status=[200, 404])
+            if response.status_code == 404:
                 metapayload = "This is the metaglobal payload which contains"\
                               " some client data that doesnt look much"\
                               " like this"
-                data = json.dumps({"id": "global", "payload": metapayload})
-                data = Data('application/json', data)
-                self.put(url, params=data)
+                self.app.put_json(url,
+                                  {"id": "global", "payload": metapayload})
 
         # GET requests to individual collections.
         num_requests = self._pick_weighted_count(get_count_distribution)
         cols = random.sample(collections, num_requests)
-        self.setOkCodes([200, 404])
         for x in range(num_requests):
-            url = node + "/%s/%s/storage/%s" % (VERSION, username, cols[x])
+            url = "/%s/%s/storage/%s" % (VERSION, username, cols[x])
             newer = int(time.time() - random.randint(3600, 360000))
-            params = {"full": "1", "newer": str(newer)}
-            self.logi("about to GET (x=%d) %s" % (x, url))
-            response = self.get(url, params)
+            response = self.app.get(url, {"full": "1", "newer": str(newer)},
+                                    status=[200, 404])
 
         # PUT requests with 10 WBOs batched together
         num_requests = self._pick_weighted_count(post_count_distribution)
         cols = random.sample(collections, num_requests)
-        self.setOkCodes([200])
         for x in range(num_requests):
-            url = node + "/%s/%s/storage/%s" % (VERSION, username, cols[x])
-            data = []
+            url = "/%s/%s/storage/%s" % (VERSION, username, cols[x])
             items_per_batch = 10
+            wbos = []
             for i in range(items_per_batch):
                 id = base64.b64encode(os.urandom(10))
                 id += str(time.time() % 100)
                 payload = username * random.randint(50, 200)
-                wbo = {'id': id, 'payload': payload}
-                data.append(wbo)
-            data = json.dumps(data)
-            data = Data('application/json', data)
-            self.logi("about to POST (x=%d) %s" % (x, url))
-            response = self.post(url, params=data)
-            body = response.body
-            self.assertTrue(body != '')
-            result = json.loads(body)
+                wbos.append({'id': id, 'payload': payload})
+
+            response = self.app.post_json(url, wbos)
+            self.assertTrue(response.body != '')
+
+            result = response.json
             self.assertEquals(len(result["success"]), items_per_batch)
             self.assertEquals(len(result["failed"]), 0)
 
@@ -157,32 +133,36 @@ class StressTest(FunkLoadTestCase):
         # We might choose to delete some individual collections, or to do
         # a full reset and delete all the data.  Never both in the same run.
         num_requests = self._pick_weighted_count(delete_count_distribution)
-        self.setOkCodes([200])
         if num_requests:
             cols = random.sample(collections, num_requests)
             for x in range(num_requests):
-                url = node + "/%s/%s/storage/%s" % (VERSION, username, cols[x])
-                self.delete(url)
+                url = "/%s/%s/storage/%s" % (VERSION, username, cols[x])
+                self.app.delete(url)
         else:
             if random.random() <= deleteall_probability:
-                url = node + "/%s/%s/storage" % (VERSION, username)
-                self.setHeader("X-Confirm-Delete", "true")
-                self.delete(url)
+                url = "/%s/%s/storage" % (VERSION, username)
+                self.app.delete(url, headers={"X-Confirm-Delete", "true"})
 
     def _pick_node(self):
-        node = None
-        # If a DB is down, add its number in here; e.g. down_dbs = [3,6]
-        down_dbs = []
-        while True:
-            node = random.randint(1, 80)
-            # Hosts 1 through 10 map to DB 1, 11 through 20 DB db 2, etc.
-            # This maps the node number back to the db number.
-            if ((node - 1) / 10) + 1 not in down_dbs:
-                break
-        return "https://stage-sync%i.services.mozilla.com" % node
+        # If we have not been told a specific server node,
+        # randomly pick one of the stage server URLs.
+        if getattr(self, 'server_url', None) is None:
+            node = None
+            # If a DB is down, add its number in here; e.g. down_dbs = [3,6]
+            down_dbs = []
+            while True:
+                node = random.randint(1, 80)
+                # Hosts 1 through 10 map to DB 1, 11 through 20 DB db 2, etc.
+                # This maps the node number back to the db number.
+                if ((node - 1) / 10) + 1 not in down_dbs:
+                    break
+
+            uri = "https://stage-sync%i.services.mozilla.com" % node
+            self.server_url = uri
 
     def _pick_user(self):
-        return "cuser%i" % random.randint(1, 1000000)
+        user = "cuser%i" % random.randint(1, 1000000)
+        return user
 
     def _pick_weighted_count(self, weights):
         i = random.randint(1, sum(weights))
