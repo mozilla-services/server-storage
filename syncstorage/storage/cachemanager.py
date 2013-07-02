@@ -47,8 +47,8 @@ import threading
 from pylibmc import Client, NotFound, ThreadMappedPool
 from pylibmc import Error as MemcachedError
 
-from metlog.decorators.stats import timeit as metlog_timeit
-from metlog.holder import CLIENT_HOLDER
+from heka.decorators.stats import timeit as heka_timeit
+from heka.holder import CLIENT_HOLDER
 
 from services.util import BackendError
 from services.events import REQUEST_ENDS, subscribe
@@ -89,7 +89,7 @@ class CacheManager(object):
         with self.pool.reserve() as mc:
             mc.flush_all()
 
-    @metlog_timeit
+    @heka_timeit
     def get(self, key):
         with self.pool.reserve() as mc:
             try:
@@ -98,7 +98,7 @@ class CacheManager(object):
                 # memcache seems down
                 raise BackendError(str(err))
 
-    @metlog_timeit
+    @heka_timeit
     def delete(self, key):
         with self.pool.reserve() as mc:
             try:
@@ -109,7 +109,7 @@ class CacheManager(object):
                 # memcache seems down
                 raise BackendError(str(err))
 
-    @metlog_timeit
+    @heka_timeit
     def incr(self, key, size=1):
         size = int(size)
         with self.pool.reserve() as mc:
@@ -120,7 +120,7 @@ class CacheManager(object):
             except MemcachedError, err:
                 raise BackendError(str(err))
 
-    @metlog_timeit
+    @heka_timeit
     def set(self, key, value):
         with self.pool.reserve() as mc:
             try:

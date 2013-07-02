@@ -81,10 +81,10 @@ class TestMemcachedSQLStorage(unittest.TestCase):
         if not MEMCACHED:
             raise SkipTest
 
-        # Ensure we have metlog loaded so the timers will work.
+        # Ensure we have heka loaded so the timers will work.
         config_file = os.path.join(os.path.dirname(__file__), "sync.conf")
         config = Config(cfgfile=config_file)
-        load_and_configure(config, "metlog_loader")
+        load_and_configure(config, "heka_loader")
 
         fd, self.dbfile = mkstemp()
         os.close(fd)

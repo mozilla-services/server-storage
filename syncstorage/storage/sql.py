@@ -66,8 +66,8 @@ from sqlalchemy.sql.compiler import SQLCompiler
 from sqlalchemy.util import queue as sqla_queue
 from sqlalchemy.pool import NullPool, QueuePool
 
-from metlog.decorators.stats import timeit as metlog_timeit
-from metlog.holder import CLIENT_HOLDER
+from heka.decorators.stats import timeit as heka_timeit
+from heka.holder import CLIENT_HOLDER
 
 from syncstorage.storage import StorageConflictError
 from syncstorage.storage.queries import get_query
@@ -81,10 +81,10 @@ from services.util import (time2bigint, bigint2time, round_time,
 from syncstorage.wbo import WBO
 
 
-METLOG_PREFIX = 'syncstorage.storage.sql.'
+HEKA_PREFIX = 'syncstorage.storage.sql.'
 
-sql_timer_name = METLOG_PREFIX + 'timed_safe_execute'
-timed_safe_execute = metlog_timeit(sql_timer_name)(safe_execute)
+sql_timer_name = HEKA_PREFIX + 'timed_safe_execute'
+timed_safe_execute = heka_timeit(sql_timer_name)(safe_execute)
 
 _KB = float(1024)
 
@@ -239,9 +239,9 @@ class _QueueWithMaxBacklog(sqla_queue.Queue):
                 # that fail immediately due to excess backlog.  They both
                 # give the same exception, so we need a flag to differentiate.
                 if backlog_exceeded:
-                    counter_name = METLOG_PREFIX + 'pool.backlog_exceeded'
+                    counter_name = HEKA_PREFIX + 'pool.backlog_exceeded'
                 else:
-                    counter_name = METLOG_PREFIX + 'pool.timeout'
+                    counter_name = HEKA_PREFIX + 'pool.timeout'
                 CLIENT_HOLDER.default_client.incr(counter_name)
                 raise
             finally:
@@ -265,29 +265,29 @@ class QueuePoolWithMaxBacklog(QueuePool):
     def __init__(self, creator, max_backlog=-1, **kwds):
         # Wrap the creator callback with some metrics logging, unless it
         # has already been wrapped.
-        if getattr(creator, "has_metlog_wrapper", False):
+        if getattr(creator, "has_heka_wrapper", False):
             logging_creator = creator
         else:
             def logging_creator(*args, **kwds):
-                counter_name = METLOG_PREFIX + '.pool.new_connection'
+                counter_name = HEKA_PREFIX + '.pool.new_connection'
                 CLIENT_HOLDER.default_client.incr(counter_name)
                 return creator(*args, **kwds)
-            logging_creator.has_metlog_wrapper = True
+            logging_creator.has_heka_wrapper = True
         QueuePool.__init__(self, logging_creator, **kwds)
         self._pool = _QueueWithMaxBacklog(self._pool.maxsize, max_backlog)
 
     def recreate(self):
-        CLIENT_HOLDER.default_client.incr(METLOG_PREFIX + 'pool.recreate')
+        CLIENT_HOLDER.default_client.incr(HEKA_PREFIX + 'pool.recreate')
         new_self = QueuePool.recreate(self)
         new_self._pool = _QueueWithMaxBacklog(self._pool.maxsize,
                                               self._pool.max_backlog)
         return new_self
 
     def dispose(self):
-        CLIENT_HOLDER.default_client.incr(METLOG_PREFIX + 'pool.dispose')
+        CLIENT_HOLDER.default_client.incr(HEKA_PREFIX + 'pool.dispose')
         return QueuePool.dispose(self)
 
-    @metlog_timeit(METLOG_PREFIX + 'pool.get')
+    @heka_timeit(HEKA_PREFIX + 'pool.get')
     def _do_get(self):
         c = QueuePool._do_get(self)
         self.logger.debug("QueuePoolWithMaxBacklog status: %s", self.status())

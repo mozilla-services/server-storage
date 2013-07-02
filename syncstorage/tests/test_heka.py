@@ -86,10 +86,10 @@ class TestMetlog(unittest.TestCase):
         data = {'foo': 'bar'}
 
         def services_data_wrapper(fn):
-            from services.metrics import update_metlog_data
+            from services.metrics import update_heka_data
 
             def new_inner(*args, **kwargs):
-                update_metlog_data(data)
+                update_heka_data(data)
                 return fn(*args, **kwargs)
 
             return new_inner

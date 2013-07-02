@@ -74,7 +74,7 @@ class TestSQLStorage(unittest.TestCase):
             self.storage.set_collection(_UID, name)
 
         self._cleanup_functions = []
-        # delete the decorator's cached metlog client
+        # delete the decorator's cached heka client
         timed_safe_execute._client = None
 
     def tearDown(self):
