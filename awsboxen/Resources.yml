@@ -1,0 +1,164 @@
+
+# A single public-facing loadbalancer, that fronts all the webheads.
+# It will have a *lot* of CNAMEs pointed at it, one for each backend
+# database host.
+
+WebLoadBalancer:
+  Type: AWS::ElasticLoadBalancing::LoadBalancer
+  Properties:
+    AvailabilityZones: {"Fn::GetAZs": ""}
+    Listeners:
+      - LoadBalancerPort: "80"
+        InstancePort: "80"
+        Protocol: HTTP
+    HealthCheck:
+      Target: "HTTP:80/__heartbeat__"
+      HealthyThreshold: "2"
+      UnhealthyThreshold: "5"
+      Interval: "10"
+      Timeout: "5"
+
+
+# An auto-scale group for bringing up webheads.
+# Currently this just maintains a fixed number of machines,
+# but we could try to be clever with scaling up/down in the future.
+
+WebAutoScaleGroup:
+  Type: AWS::AutoScaling::AutoScalingGroup
+  Properties:
+    AvailabilityZones: {"Fn::GetAZs": ""}
+    LaunchConfigurationName: {"Ref": "WebLaunchConfig"}
+    DesiredCapacity: "4"
+    MinSize: "4"
+    MaxSize: "4"
+    LoadBalancerNames:
+      - {"Ref": "WebLoadBalancer"}
+
+
+WebLaunchConfig:
+  Type: AWS::AutoScaling::LaunchConfiguration
+  Properties:
+    InstanceType: m1.large
+    ImageId: {"Ref": "WebServerAMI"}  # this comes from Boxen[WebServer]
+    KeyName: {"Ref": "AWSBoxDeployKey"}
+    SecurityGroups: 
+      - {"Ref": "WebSecurityGroup"}
+
+
+WebSecurityGroup:
+  Type: AWS::EC2::SecurityGroup
+  Properties:
+    GroupDescription:  awsboxen security group for server-storage webheads
+    SecurityGroupIngress:
+      # Allow ssh from anywhere
+      - IpProtocol: "tcp"
+        FromPort: "22"
+        ToPort: "22"
+        CidrIp: "0.0.0.0/0"
+
+
+WebSecurityGroupLBIngress:
+  # Allow port 80 ingress from the load balancer.
+  # This has to be a separate resources to avoid circular references
+  # between the LoadBalancer and the LaunchConfig.
+  Type: AWS::EC2::SecurityGroupIngress
+  Properties:
+    GroupName: {"Ref": "WebSecurityGroup"}
+    IpProtocol: "tcp"
+    FromPort: "80"
+    ToPort: "80"
+    SourceSecurityGroupOwnerId: {"Fn::GetAtt": ["WebLoadBalancer", "SourceSecurityGroup.OwnerAlias"]}
+    SourceSecurityGroupName: {"Fn::GetAtt": ["WebLoadBalancer", "SourceSecurityGroup.GroupName"]}
+
+
+# A stand-alone EC2 instance per database host.
+# Eventually there could be quite a lot of them!
+
+
+DBServer1:
+  Type: AWS::EC2::Instance
+  Properties:
+    InstanceType: m1.large
+    ImageId: {"Ref": "DBServerAMI"}  # this comes from Boxen[DBServer]
+    KeyName: {"Ref": "AWSBoxDeployKey"}
+    SecurityGroups:
+      - {"Ref": "DBSecurityGroup"}
+
+
+DBServer2:
+  Type: AWS::EC2::Instance
+  Properties:
+    InstanceType: m1.large
+    ImageId: {"Ref": "DBServerAMI"}  # this comes from Boxen[DBServer]
+    KeyName: {"Ref": "AWSBoxDeployKey"}
+    SecurityGroups:
+      - {"Ref": "DBSecurityGroup"}
+
+
+DBServer3:
+  Type: AWS::EC2::Instance
+  Properties:
+    InstanceType: m1.large
+    ImageId: {"Ref": "DBServerAMI"}  # this comes from Boxen[DBServer]
+    KeyName: {"Ref": "AWSBoxDeployKey"}
+    SecurityGroups:
+      - {"Ref": "DBSecurityGroup"}
+
+
+DBSecurityGroup:
+  Type: AWS::EC2::SecurityGroup
+  Properties:
+    GroupDescription:  awsboxen security group for server-storage databases
+    SecurityGroupIngress:
+      # Allow ssh from anywhere
+      - IpProtocol: "tcp"
+        FromPort: "22"
+        ToPort: "22"
+        CidrIp: "0.0.0.0/0"
+      # Allow mysql access from the webheads
+      - IpProtocol: "tcp"
+        FromPort: "3306"
+        ToPort: "3306"
+        SourceSecurityGroupName: {"Ref": "WebSecurityGroup"}
+
+
+# DNS Records to point the public at the load-balancer.
+# There's one record per backend database.
+# If this thing ever goes live, that'll be a *lot* of records!
+
+DNSRecords:
+  Type: AWS::Route53::RecordSetGroup
+  Properties:
+    Comment: awsboxen dns records for server-storage
+    HostedZoneName: allizomaws.net.
+    RecordSets:
+      - Name: "sync1.rfkelly.allizomaws.net."
+        Type: "CNAME"
+        TTL: 30
+        ResourceRecords:
+          - {"Fn::GetAtt": ["WebLoadBalancer", "DNSName"]}
+      - Name: "sync2.rfkelly.allizomaws.net."
+        Type: "CNAME"
+        TTL: 30
+        ResourceRecords:
+          - {"Fn::GetAtt": ["WebLoadBalancer", "DNSName"]}
+      - Name: "sync3.rfkelly.allizomaws.net."
+        Type: "CNAME"
+        TTL: 30
+        ResourceRecords:
+          - {"Fn::GetAtt": ["WebLoadBalancer", "DNSName"]}
+      - Name: "db1.rfkelly.allizomaws.net."
+        Type: "CNAME"
+        TTL: 30
+        ResourceRecords:
+          - {"Fn::GetAtt": ["DBServer1", "PublicDnsName"]}
+      - Name: "db2.rfkelly.allizomaws.net."
+        Type: "CNAME"
+        TTL: 30
+        ResourceRecords:
+          - {"Fn::GetAtt": ["DBServer2", "PublicDnsName"]}
+      - Name: "db3.rfkelly.allizomaws.net."
+        Type: "CNAME"
+        TTL: 30
+        ResourceRecords:
+          - {"Fn::GetAtt": ["DBServer3", "PublicDnsName"]}
