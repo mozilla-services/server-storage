@@ -39,7 +39,7 @@ Application entry point.
 from webob.exc import HTTPServiceUnavailable
 
 from services.baseapp import set_app, SyncServerApp
-from services.wsgiauth import Authentication
+from services.whoauth import WhoAuthentication
 from syncstorage.controller import StorageController
 from syncstorage.storage import get_storage
 
@@ -97,7 +97,7 @@ controllers = {'storage': StorageController}
 class StorageServerApp(SyncServerApp):
     """Storage application"""
     def __init__(self, urls, controllers, config=None,
-                 auth_class=Authentication):
+                 auth_class=WhoAuthentication):
         super(StorageServerApp, self).__init__(urls, controllers, config,
                                                auth_class)
         self.config = config
@@ -219,4 +219,4 @@ class StorageServerApp(SyncServerApp):
 
 
 make_app = set_app(urls, controllers, klass=StorageServerApp,
-                   auth_class=Authentication)
+                   auth_class=WhoAuthentication)
